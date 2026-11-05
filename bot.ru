@@ -19,7 +19,7 @@ import config
 logging.basicConfig(level=logging.INFO)
 
 # Бот ва Диспетчер
-bot = Bot(token='9083417667:AAH3XMvHWu4D0BZyLZ2vY4ng10rh6Fq_dAM')
+bot = Bot(token='')
 dp = Dispatcher()
 
 # Базани ишга тушириш

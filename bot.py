@@ -75,6 +75,59 @@ confirm_keyboard = ReplyKeyboardMarkup(
 )
 
 
+@dp.message(F.text == "📊 Ҳисобот")
+async def report(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT
+                    entry_type,
+                    COALESCE(SUM(amount), 0) AS total,
+                    COUNT(*) AS count
+                FROM transactions
+                WHERE telegram_user_id = :user_id
+                GROUP BY entry_type
+            """),
+            {"user_id": user_id}
+        )
+
+        rows = result.mappings().all()
+
+    expenses = next(
+        (row["total"] for row in rows if row["entry_type"] == "expense"),
+        0
+    )
+
+    incomes = next(
+        (row["total"] for row in rows if row["entry_type"] == "income"),
+        0
+    )
+
+    expense_count = next(
+        (row["count"] for row in rows if row["entry_type"] == "expense"),
+        0
+    )
+
+    income_count = next(
+        (row["count"] for row in rows if row["entry_type"] == "income"),
+        0
+    )
+
+    balance = incomes - expenses
+
+    await message.answer(
+        "📊 СИЗНИНГ ҲИСОБОТИНГИЗ\n\n"
+        f"💰 Жами даромад: {incomes:,.0f} сўм\n"
+        f"➕ Даромадлар сони: {income_count} та\n\n"
+        f"🛒 Жами харажат: {expenses:,.0f} сўм\n"
+        f"➖ Харажатлар сони: {expense_count} та\n\n"
+        f"💵 Қолдиқ: {balance:,.0f} сўм"
+        .replace(",", " "),
+        reply_markup=main_keyboard()
+    )
+
 @dp.message(CommandStart())
 async def start(message: Message):
     await message.answer(

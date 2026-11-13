@@ -45,6 +45,29 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as connection:
         await connection.execute(text("""
             CREATE TABLE IF NOT EXISTS transactions (
+                        await connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS families (
+                id BIGSERIAL PRIMARY KEY,
+                owner_telegram_user_id BIGINT NOT NULL,
+                invite_code VARCHAR(20) UNIQUE NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+
+        await connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS family_members (
+                id BIGSERIAL PRIMARY KEY,
+                family_id BIGINT REFERENCES families(id) ON DELETE CASCADE,
+                telegram_user_id BIGINT UNIQUE NOT NULL,
+                role VARCHAR(20) DEFAULT 'member',
+                joined_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+
+        await connection.execute(text("""
+            ALTER TABLE transactions
+            ADD COLUMN IF NOT EXISTS family_id BIGINT
+        """))
                 id BIGSERIAL PRIMARY KEY,
                 telegram_user_id BIGINT NOT NULL,
                 entry_type VARCHAR(20) NOT NULL,

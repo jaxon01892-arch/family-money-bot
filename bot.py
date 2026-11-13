@@ -6,11 +6,7 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
-from aiogram.types import (
-    Message,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -28,30 +24,22 @@ def get_database_url():
     ]
 
     scheme = parts.scheme.replace(
-        "postgresql",
-        "postgresql+asyncpg"
+        "postgresql", "postgresql+asyncpg"
     )
 
     return urlunsplit((
-        scheme,
-        parts.netloc,
-        parts.path,
-        urlencode(query),
-        parts.fragment
+        scheme, parts.netloc, parts.path,
+        urlencode(query), parts.fragment
     ))
 
 
 engine = create_async_engine(
     get_database_url(),
-    connect_args={
-        "ssl": "require",
-        "statement_cache_size": 0
-    }
+    connect_args={"ssl": "require", "statement_cache_size": 0}
 )
 
 TOKEN = os.getenv("BOT_TOKEN", "")
 dp = Dispatcher()
-
 pending = {}
 
 
@@ -66,6 +54,36 @@ def main_keyboard():
     )
 
 
+def category_keyboard(entry_type):
+    if entry_type == "expense":
+        categories = [
+            "🥩 Озиқ-овқат",
+            "🚗 Транспорт",
+            "🏠 Уй-рўзғор",
+            "💊 Соғлиқ",
+            "👕 Кийим-кечак",
+            "📚 Таълим",
+            "📦 Бошқа харажат"
+        ]
+    else:
+        categories = [
+            "💼 Маош",
+            "💰 Қўшимча даромад",
+            "🎁 Совға",
+            "📦 Бошқа даромад"
+        ]
+
+    buttons = [
+        [KeyboardButton(text=category)]
+        for category in categories
+    ]
+
+    return ReplyKeyboardMarkup(
+        keyboard=buttons,
+        resize_keyboard=True
+    )
+
+
 confirm_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="✅ Тасдиқлаш")],
@@ -75,64 +93,10 @@ confirm_keyboard = ReplyKeyboardMarkup(
 )
 
 
-@dp.message(F.text == "📊 Ҳисобот")
-async def report(message: Message):
-    user_id = message.from_user.id
-
-    async with engine.connect() as connection:
-        result = await connection.execute(
-            text("""
-                SELECT
-                    entry_type,
-                    COALESCE(SUM(amount), 0) AS total,
-                    COUNT(*) AS count
-                FROM transactions
-                WHERE telegram_user_id = :user_id
-                GROUP BY entry_type
-            """),
-            {"user_id": user_id}
-        )
-
-        rows = result.mappings().all()
-
-    expenses = next(
-        (row["total"] for row in rows if row["entry_type"] == "expense"),
-        0
-    )
-
-    incomes = next(
-        (row["total"] for row in rows if row["entry_type"] == "income"),
-        0
-    )
-
-    expense_count = next(
-        (row["count"] for row in rows if row["entry_type"] == "expense"),
-        0
-    )
-
-    income_count = next(
-        (row["count"] for row in rows if row["entry_type"] == "income"),
-        0
-    )
-
-    balance = incomes - expenses
-
-    await message.answer(
-        "📊 СИЗНИНГ ҲИСОБОТИНГИЗ\n\n"
-        f"💰 Жами даромад: {incomes:,.0f} сўм\n"
-        f"➕ Даромадлар сони: {income_count} та\n\n"
-        f"🛒 Жами харажат: {expenses:,.0f} сўм\n"
-        f"➖ Харажатлар сони: {expense_count} та\n\n"
-        f"💵 Қолдиқ: {balance:,.0f} сўм"
-        .replace(",", " "),
-        reply_markup=main_keyboard()
-    )
-
 @dp.message(CommandStart())
 async def start(message: Message):
     await message.answer(
-        "Салом! Family Money ботига хуш келибсиз! 🎉\n\n"
-        "Оилавий даромад ва харажатларингизни бошқариш мумкин.",
+        "Салом! Family Money ботига хуш келибсиз! 🎉",
         reply_markup=main_keyboard()
     )
 
@@ -142,7 +106,7 @@ async def expense(message: Message):
     pending[message.from_user.id] = {"type": "expense"}
 
     await message.answer(
-        "Харажат номини ва суммасини ёзинг.\n\n"
+        "Харажат номини ва суммасини ёзинг.\n"
         "Масалан: Пиёз 20000"
     )
 
@@ -152,7 +116,7 @@ async def income(message: Message):
     pending[message.from_user.id] = {"type": "income"}
 
     await message.answer(
-        "Даромад номини ва суммасини ёзинг.\n\n"
+        "Даромад номини ва суммасини ёзинг.\n"
         "Масалан: Маош 5000000"
     )
 
@@ -167,12 +131,56 @@ async def cancel(message: Message):
     )
 
 
+@dp.message(F.text == "📊 Ҳисобот")
+async def report(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT entry_type,
+                       COALESCE(SUM(amount), 0) AS total,
+                       COUNT(*) AS count
+                FROM transactions
+                WHERE telegram_user_id = :user_id
+                GROUP BY entry_type
+            """),
+            {"user_id": user_id}
+        )
+
+        rows = result.mappings().all()
+
+    expenses = next(
+        (r["total"] for r in rows if r["entry_type"] == "expense"), 0
+    )
+    incomes = next(
+        (r["total"] for r in rows if r["entry_type"] == "income"), 0
+    )
+    expense_count = next(
+        (r["count"] for r in rows if r["entry_type"] == "expense"), 0
+    )
+    income_count = next(
+        (r["count"] for r in rows if r["entry_type"] == "income"), 0
+    )
+
+    await message.answer(
+        "📊 СИЗНИНГ ҲИСОБОТИНГИЗ\n\n"
+        f"💰 Жами даромад: {incomes:,.0f} сўм\n"
+        f"➕ Даромадлар сони: {income_count} та\n\n"
+        f"🛒 Жами харажат: {expenses:,.0f} сўм\n"
+        f"➖ Харажатлар сони: {expense_count} та\n\n"
+        f"💵 Қолдиқ: {incomes - expenses:,.0f} сўм"
+        .replace(",", " "),
+        reply_markup=main_keyboard()
+    )
+
+
 @dp.message(F.text == "✅ Тасдиқлаш")
 async def confirm(message: Message):
     user_id = message.from_user.id
     data = pending.get(user_id)
 
-    if not data or "amount" not in data:
+    if not data or "amount" not in data or "category" not in data:
         await message.answer("Тасдиқлаш учун маълумот топилмади.")
         return
 
@@ -180,14 +188,15 @@ async def confirm(message: Message):
         await connection.execute(
             text("""
                 INSERT INTO transactions
-                (telegram_user_id, entry_type, item_name, amount)
-                VALUES (:user_id, :entry_type, :item_name, :amount)
+                (telegram_user_id, entry_type, item_name, amount, category)
+                VALUES (:user_id, :entry_type, :item_name, :amount, :category)
             """),
             {
                 "user_id": user_id,
                 "entry_type": data["type"],
                 "item_name": data["name"],
-                "amount": data["amount"]
+                "amount": data["amount"],
+                "category": data["category"]
             }
         )
 
@@ -211,45 +220,63 @@ async def messages(message: Message):
         )
         return
 
+    if data.get("step") == "category":
+        valid_categories = (
+            ["🥩 Озиқ-овқат", "🚗 Транспорт", "🏠 Уй-рўзғор",
+             "💊 Соғлиқ", "👕 Кийим-кечак", "📚 Таълим",
+             "📦 Бошқа харажат"]
+            if data["type"] == "expense"
+            else ["💼 Маош", "💰 Қўшимча даромад",
+                  "🎁 Совға", "📦 Бошқа даромад"]
+        )
+
+        if message.text not in valid_categories:
+            await message.answer(
+                "Илтимос, рўйхатдан категория танланг.",
+                reply_markup=category_keyboard(data["type"])
+            )
+            return
+
+        data["category"] = message.text
+        data["step"] = "confirm"
+
+        kind = "Харажат" if data["type"] == "expense" else "Даромад"
+
+        await message.answer(
+            f"Маълумотни текширинг:\n\n"
+            f"Тури: {kind}\n"
+            f"Номи: {data['name']}\n"
+            f"Категория: {data['category']}\n"
+            f"Суммаси: {data['amount']} сўм\n\n"
+            "Сақлашни тасдиқлайсизми?",
+            reply_markup=confirm_keyboard
+        )
+        return
+
     numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text)
 
     if not numbers:
-        await message.answer(
-            "Суммани ҳам ёзинг.\nМасалан: Пиёз 20000"
-        )
+        await message.answer("Суммани ҳам ёзинг. Масалан: Пиёз 20000")
         return
 
     amount = numbers[-1].replace(",", ".")
 
+    name = re.sub(r"\d+(?:[.,]\d+)?", "", message.text)
     name = re.sub(
-        r"\d+(?:[.,]\d+)?",
-        "",
-        message.text
-    )
-
-    name = re.sub(
-        r"\b(сўм|сум|uzs)\b",
-        "",
-        name,
-        flags=re.IGNORECASE
+        r"\b(сўм|сум|uzs)\b", "", name, flags=re.IGNORECASE
     ).strip(" ,.-")
 
     if not name:
-        await message.answer("Харажат ёки даромад номини ҳам ёзинг.")
+        await message.answer("Номини ҳам ёзинг.")
         return
 
     data["name"] = name
     data["amount"] = amount
-
-    kind = "Харажат" if data["type"] == "expense" else "Даромад"
+    data["step"] = "category"
 
     await message.answer(
-        f"Маълумотни текширинг:\n\n"
-        f"Тури: {kind}\n"
-        f"Номи: {name}\n"
-        f"Суммаси: {amount} сўм\n\n"
-        f"Сақлашни тасдиқлайсизми?",
-        reply_markup=confirm_keyboard
+        "Қайси категорияга киради?",
+        reply_markup=category_keyboard(data["type"])
     )
 
 

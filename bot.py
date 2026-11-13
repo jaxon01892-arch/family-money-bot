@@ -546,6 +546,10 @@ def report_filter(info, user_id):
             (
                 family_id = :family_id
                 OR (
+                    telegram_user_id = :owner_id
+                    AND family_id IS NULL
+                )
+                OR (
                     telegram_user_id = :user_id
                     AND family_id IS NULL
                 )
@@ -1003,6 +1007,17 @@ async def report(message: Message):
 
         if info:
             params["family_id"] = info["family_id"]
+
+            owner_result = await connection.execute(
+                text("""
+                    SELECT owner_telegram_user_id
+                    FROM families
+                    WHERE id = :family_id
+                """),
+                {"family_id": info["family_id"]}
+            )
+
+            params["owner_id"] = owner_result.scalar()
 
         result = await connection.execute(
             text(f"""

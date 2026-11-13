@@ -131,7 +131,7 @@ async def cancel(message: Message):
     )
 
 
-@dp.message(F.text == "📊 Ҳисобот")
+
 
 @dp.message(F.text == "📊 Ҳисобот")
 async def report(message: Message):

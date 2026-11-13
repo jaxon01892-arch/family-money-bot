@@ -59,7 +59,8 @@ def main_keyboard():
         keyboard=[
             [KeyboardButton(text="➕ Харажат киритиш")],
             [KeyboardButton(text="💰 Даромад киритиш")],
-            [KeyboardButton(text="📊 Ҳисобот")]
+            [KeyboardButton(text="📊 Ҳисобот")],
+            [KeyboardButton(text="🧾 Харажатлар тарихи")]
         ],
         resize_keyboard=True
     )

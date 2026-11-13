@@ -6,7 +6,14 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery
+)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -51,7 +58,7 @@ TOKEN = os.getenv("BOT_TOKEN", "")
 
 dp = Dispatcher()
 pending = {}
-
+editing = {}
 
 # ASOSIY MENYU
 def main_keyboard():
@@ -147,6 +154,7 @@ async def income(message: Message):
 @dp.message(F.text == "❌ Бекор қилиш")
 async def cancel(message: Message):
     pending.pop(message.from_user.id, None)
+    editing.pop(user_id, None)
 
     await message.answer(
         "Маълумот бекор қилинди.",
@@ -161,6 +169,7 @@ async def history(message: Message):
         result = await connection.execute(
             text("""
                 SELECT
+                    id,
                     entry_type,
                     item_name,
                     amount,
@@ -178,12 +187,12 @@ async def history(message: Message):
 
     if not rows:
         await message.answer(
-            "Ҳозирча харажатлар ва даромадлар тарихи мавжуд эмас.",
+            "Ҳозирча операциялар мавжуд эмас.",
             reply_markup=main_keyboard()
         )
         return
 
-    history_text = "🧾 ОХИРГИ 10 ТА ОПЕРАЦИЯ:\n\n"
+    await message.answer("🧾 ОХИРГИ 10 ТА ОПЕРАЦИЯ:")
 
     for r in rows:
         kind = (
@@ -194,20 +203,33 @@ async def history(message: Message):
 
         date = r["created_at"].strftime("%d.%m.%Y %H:%M")
 
-        history_text += (
+        operation_text = (
             f"{kind}\n"
             f"📅 Сана: {date}\n"
             f"📝 Номи: {r['item_name']}\n"
             f"📂 Категория: {r['category']}\n"
-            f"💵 Сумма: {r['amount']:,.0f} сўм\n"
-            "--------------------\n"
+            f"💵 Сумма: {r['amount']:,.0f} сўм"
+        ).replace(",", " ")
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="✏️ Таҳрирлаш",
+                        callback_data=f"edit:{r['id']}"
+                    ),
+                    InlineKeyboardButton(
+                        text="🗑 Ўчириш",
+                        callback_data=f"delete:{r['id']}"
+                    )
+                ]
+            ]
         )
 
-    await message.answer(
-        history_text,
-        reply_markup=main_keyboard()
-    )
-
+        await message.answer(
+            operation_text,
+            reply_markup=keyboard
+        )
 
 # HISOBOT
 @dp.message(F.text == "📊 Ҳисобот")
@@ -340,10 +362,147 @@ async def confirm(message: Message):
     )
 
 
+# OPERATSIYANI TAHRIRLASH
+@dp.callback_query(F.data.startswith("edit:"))
+async def edit_operation(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    operation_id = int(callback.data.split(":")[1])
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT id
+                FROM transactions
+                WHERE id = :id
+                  AND telegram_user_id = :user_id
+            """),
+            {"id": operation_id, "user_id": user_id}
+        )
+        row = result.first()
+
+    if not row:
+        await callback.answer("Операция топилмади!", show_alert=True)
+        return
+
+    editing[user_id] = operation_id
+
+    await callback.message.answer(
+        "✏️ Янги ном ва суммани ёзинг.\n"
+        "Масалан: Гўшт 160000"
+    )
+    await callback.answer()
+
+
+# OPERATSIYANI O'CHIRISH
+@dp.callback_query(F.data.startswith("delete:"))
+async def delete_operation(callback: CallbackQuery):
+    operation_id = int(callback.data.split(":")[1])
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ҳа, ўчириш",
+                    callback_data=f"delete_yes:{operation_id}"
+                ),
+                InlineKeyboardButton(
+                    text="❌ Йўқ",
+                    callback_data=f"delete_no:{operation_id}"
+                )
+            ]
+        ]
+    )
+
+    await callback.message.answer(
+        "⚠️ Ушбу операцияни ўчиришни тасдиқлайсизми?",
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("delete_yes:"))
+async def confirm_delete(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    operation_id = int(callback.data.split(":")[1])
+
+    async with engine.begin() as connection:
+        result = await connection.execute(
+            text("""
+                DELETE FROM transactions
+                WHERE id = :id
+                  AND telegram_user_id = :user_id
+            """),
+            {"id": operation_id, "user_id": user_id}
+        )
+
+    if result.rowcount:
+        await callback.message.edit_text("✅ Операция ўчирилди.")
+    else:
+        await callback.message.edit_text("Операция топилмади.")
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("delete_no:"))
+async def cancel_delete(callback: CallbackQuery):
+    await callback.message.edit_text("❌ Ўчириш бекор қилинди.")
+    await callback.answer()
+
 # MATN VA SUMMANI QABUL QILISH
 @dp.message(F.text)
 async def messages(message: Message):
     user_id = message.from_user.id
+        # TAHRIRLASH JARAYONI
+    if user_id in editing:
+        numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text)
+
+        if not numbers:
+            await message.answer(
+                "Суммани ҳам киритинг.\nМасалан: Гўшт 160000"
+            )
+            return
+
+        amount = numbers[-1].replace(",", ".")
+        name = re.sub(r"\d+(?:[.,]\d+)?", "", message.text)
+        name = re.sub(
+            r"\b(сўм|сум|uzs)\b",
+            "",
+            name,
+            flags=re.IGNORECASE
+        ).strip(" ,.-")
+
+        if not name:
+            await message.answer(
+                "Операция номини ҳам киритинг.\nМасалан: Гўшт 160000"
+            )
+            return
+
+        operation_id = editing[user_id]
+
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("""
+                    UPDATE transactions
+                    SET item_name = :name,
+                        amount = :amount
+                    WHERE id = :id
+                      AND telegram_user_id = :user_id
+                """),
+                {
+                    "name": name,
+                    "amount": amount,
+                    "id": operation_id,
+                    "user_id": user_id
+                }
+            )
+
+        editing.pop(user_id, None)
+
+        await message.answer(
+            "✅ Операция янгиланди!",
+            reply_markup=main_keyboard()
+        )
+        return
     data = pending.get(user_id)
 
     if not data:

@@ -23,7 +23,9 @@ def get_database_url():
         if key not in ("sslmode", "channel_binding")
     ]
 
-    scheme = parts.scheme.replace("postgresql", "postgresql+asyncpg")
+    scheme = parts.scheme.replace(
+        "postgresql", "postgresql+asyncpg"
+    )
 
     return urlunsplit((
         scheme,
@@ -43,9 +45,20 @@ engine = create_async_engine(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as connection:
+
         await connection.execute(text("""
             CREATE TABLE IF NOT EXISTS transactions (
-                        await connection.execute(text("""
+                id BIGSERIAL PRIMARY KEY,
+                telegram_user_id BIGINT NOT NULL,
+                entry_type VARCHAR(20) NOT NULL,
+                item_name TEXT NOT NULL,
+                amount NUMERIC(14, 2) NOT NULL,
+                category TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+
+        await connection.execute(text("""
             CREATE TABLE IF NOT EXISTS families (
                 id BIGSERIAL PRIMARY KEY,
                 owner_telegram_user_id BIGINT NOT NULL,
@@ -67,15 +80,6 @@ async def lifespan(app: FastAPI):
         await connection.execute(text("""
             ALTER TABLE transactions
             ADD COLUMN IF NOT EXISTS family_id BIGINT
-        """))
-                id BIGSERIAL PRIMARY KEY,
-                telegram_user_id BIGINT NOT NULL,
-                entry_type VARCHAR(20) NOT NULL,
-                item_name TEXT NOT NULL,
-                amount NUMERIC(14, 2) NOT NULL,
-                category TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            )
         """))
 
     bot_task = asyncio.create_task(run_bot())

@@ -132,7 +132,73 @@ async def cancel(message: Message):
 
 
 @dp.message(F.text == "📊 Ҳисобот")
+
+@dp.message(F.text == "📊 Ҳисобот")
 async def report(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT
+                    entry_type,
+                    COALESCE(category, 'Категориясиз') AS category,
+                    COALESCE(SUM(amount), 0) AS total,
+                    COUNT(*) AS count
+                FROM transactions
+                WHERE telegram_user_id = :user_id
+                GROUP BY entry_type, category
+                ORDER BY entry_type, category
+            """),
+            {"user_id": user_id}
+        )
+
+        rows = result.mappings().all()
+
+    incomes = sum(
+        r["total"] for r in rows if r["entry_type"] == "income"
+    )
+    expenses = sum(
+        r["total"] for r in rows if r["entry_type"] == "expense"
+    )
+
+    income_count = sum(
+        r["count"] for r in rows if r["entry_type"] == "income"
+    )
+    expense_count = sum(
+        r["count"] for r in rows if r["entry_type"] == "expense"
+    )
+
+    income_details = [
+        f"  • {r['category']}: {r['total']:,.0f} сўм"
+        for r in rows if r["entry_type"] == "income"
+    ]
+
+    expense_details = [
+        f"  • {r['category']}: {r['total']:,.0f} сўм"
+        for r in rows if r["entry_type"] == "expense"
+    ]
+
+    report_text = (
+        "📊 СИЗНИНГ ҲИСОБОТИНГИЗ\n\n"
+        f"💰 Жами даромад: {incomes:,.0f} сўм\n"
+        f"➕ Даромадлар сони: {income_count} та\n\n"
+        "💵 ДАРОМАДЛАР КАТЕГОРИЯСИ:\n"
+        + ("\n".join(income_details) if income_details else "  Маълумот йўқ")
+        + "\n\n"
+        f"🛒 Жами харажат: {expenses:,.0f} сўм\n"
+        f"➖ Харажатлар сони: {expense_count} та\n\n"
+        "📂 ХАРАЖАТЛАР КАТЕГОРИЯСИ:\n"
+        + ("\n".join(expense_details) if expense_details else "  Маълумот йўқ")
+        + "\n\n"
+        f"💵 Қолдиқ: {incomes - expenses:,.0f} сўм"
+    ).replace(",", " ")
+
+    await message.answer(
+        report_text,
+        reply_markup=main_keyboard()
+    )
+
     user_id = message.from_user.id
 
     async with engine.connect() as connection:

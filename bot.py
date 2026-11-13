@@ -3,6 +3,9 @@ import os
 import re
 import asyncio
 import secrets
+import hashlib
+
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -24,6 +27,21 @@ from sqlalchemy.ext.asyncio import create_async_engine
 ADMIN_ID = 8700729040
 TOKEN = os.getenv("BOT_TOKEN", "")
 TZ = ZoneInfo("Asia/Tashkent")
+DASHBOARD_URL = os.getenv(
+    "DASHBOARD_URL",
+    "https://family-money-bot-1.onrender.com"
+).rstrip("/")
+
+
+def hash_token(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+debt_pending = {}
+DASHBOARD_URL = os.getenv(
+    "DASHBOARD_URL",
+    "https://family-money-bot-1.onrender.com"
+).rstrip("/")
 
 EXPENSE_DEFAULTS = [
     "🥩 Озиқ-овқат", "🚗 Транспорт", "🏠 Уй-рўзғор",
@@ -69,6 +87,65 @@ edit_pending = {}
 family_pending = {}
 date_flow = {}
 category_manage_pending = {}
+debt_pending = {}
+
+
+# =====================================================
+# YORDAMCHI FUNKSIYALAR
+# =====================================================
+def money(value):
+    return f"{float(value):,.0f}".replace(",", " ")
+
+
+def parse_amount(value):
+    cleaned = value.replace(" ", "").replace(",", ".")
+    try:
+        amount = Decimal(cleaned)
+        if amount <= 0:
+            return None
+        return amount
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def get_user_full_name(user):
+    return " ".join(
+        x for x in [
+            user.first_name or "",
+            user.last_name or ""
+        ] if x
+    ).strip()
+
+
+async def get_family_info(connection, user_id):
+    result = await connection.execute(
+        text("""
+            SELECT family_id, role
+            FROM family_members
+            WHERE telegram_user_id=:user_id
+        """),
+        {"user_id": user_id}
+    )
+    row = result.mappings().first()
+    return (
+        {"family_id": row["family_id"], "role": row["role"]}
+        if row else None
+    )
+
+
+async def get_family_id(connection, user_id):
+    info = await get_family_info(connection, user_id)
+    return info["family_id"] if info else None
+
+
+def clear_user_states(user_id):
+    pending.pop(user_id, None)
+    editing.pop(user_id, None)
+    edit_pending.pop(user_id, None)
+    family_pending.pop(user_id, None)
+    date_flow.pop(user_id, None)
+    category_manage_pending.pop(user_id, None)
+    debt_pending.pop(user_id, None)
 
 
 # =====================================================
@@ -77,16 +154,25 @@ category_manage_pending = {}
 def main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="➕ Харажат киритиш")],
-            [KeyboardButton(text="💰 Даромад киритиш")],
-            [KeyboardButton(text="📊 Ҳисобот")],
-            [KeyboardButton(text="🧾 Харажатлар тарихи")],
-            [KeyboardButton(text="⚙️ Категориялар")],
-            [KeyboardButton(text="👨‍👩‍👧‍👦 Оилам")]
+            [
+                KeyboardButton(text="➕ Харажат киритиш"),
+                KeyboardButton(text="💰 Даромад киритиш")
+            ],
+            [
+                KeyboardButton(text="📊 Ҳисобот"),
+                KeyboardButton(text="📈 Дашборд")
+            ],
+            [
+                KeyboardButton(text="🧾 Харажатлар тарихи"),
+                KeyboardButton(text="💳 Қарзлар")
+            ],
+            [
+                KeyboardButton(text="⚙️ Категориялар"),
+                KeyboardButton(text="👨‍👩‍👧‍👦 Оилам")
+            ]
         ],
         resize_keyboard=True
     )
-
 
 def category_keyboard(categories):
     return ReplyKeyboardMarkup(
@@ -128,6 +214,19 @@ def category_manage_keyboard():
     )
 
 
+def debt_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🤝 Берган қарзим")],
+            [KeyboardButton(text="📥 Олган қарзим")],
+            [KeyboardButton(text="📋 Қарзлар рўйхати")],
+            [KeyboardButton(text="📜 Қарзлар тарихи")],
+            [KeyboardButton(text="⬅️ Асосий меню")]
+        ],
+        resize_keyboard=True
+    )
+
+
 confirm_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="✅ Тасдиқлаш")],
@@ -148,18 +247,14 @@ edit_confirm_keyboard = ReplyKeyboardMarkup(
 def family_action_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="➕ Оила яратиш",
-                    callback_data="family_create"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🔑 Таклиф коди билан қўшилиш",
-                    callback_data="family_join"
-                )
-            ]
+            [InlineKeyboardButton(
+                text="➕ Оила яратиш",
+                callback_data="family_create"
+            )],
+            [InlineKeyboardButton(
+                text="🔑 Таклиф коди билан қўшилиш",
+                callback_data="family_join"
+            )]
         ]
     )
 
@@ -167,15 +262,6 @@ def family_action_keyboard():
 # =====================================================
 # FOYDALANUVCHI PROFILI VA RUXSAT
 # =====================================================
-def get_user_full_name(user):
-    return " ".join(
-        x for x in [
-            user.first_name or "",
-            user.last_name or ""
-        ] if x
-    ).strip()
-
-
 async def save_user_profile(user):
     if not user:
         return
@@ -222,7 +308,6 @@ async def request_access(user, bot, retry_rejected=False):
             """),
             {"user_id": user_id}
         )
-
         status = result.scalar()
 
         if status is None:
@@ -335,7 +420,6 @@ class AccessMiddleware(BaseMiddleware):
                 "Администратор рухсатини кутинг.",
                 show_alert=True
             )
-
         return
 
 
@@ -435,65 +519,87 @@ async def reject_access(callback: CallbackQuery):
 
 
 # =====================================================
+# DASHBOARD HAVOLASI
+# =====================================================
+async def create_dashboard_link(user_id):
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(
+        raw_token.encode("utf-8")
+    ).hexdigest()
+
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("""
+                DELETE FROM dashboard_sessions
+                WHERE expires_at < NOW()
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                INSERT INTO dashboard_sessions
+                    (telegram_user_id, token_hash, expires_at)
+                VALUES
+                    (:user_id, :token_hash,
+                     NOW() + INTERVAL '7 days')
+            """),
+            {
+                "user_id": user_id,
+                "token_hash": token_hash
+            }
+        )
+
+    return f"{DASHBOARD_URL}/dashboard?token={raw_token}"
+
+
+@dp.message(F.text == "📈 Дашборд")
+async def dashboard_button(message: Message):
+    user_id = message.from_user.id
+
+    status = await get_access_status(user_id)
+    if user_id != ADMIN_ID and status != "approved":
+        await message.answer(
+            "Дашборддан фойдаланиш учун администратор рухсати керак."
+        )
+        return
+
+    try:
+        link = await create_dashboard_link(user_id)
+    except Exception:
+        await message.answer(
+            "Дашборд ҳаволасини яратишда хатолик юз берди. "
+            "Бироздан кейин қайта уриниб кўринг."
+        )
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(
+                text="📈 Дашбордни очиш",
+                url=link
+            )
+        ]]
+    )
+
+    await message.answer(
+        "📈 FAMILY MONEY ДАШБОРДИ\n\n"
+        "Қуйидаги тугма орқали шахсий ёки оилавий "
+        "молиявий кўрсаткичларни кўришингиз мумкин.\n\n"
+        "🔐 Ҳавола 7 кун давомида амал қилади. "
+        "Уни бошқа одамларга юборманг.",
+        reply_markup=keyboard
+    )
+
+
+# =====================================================
 # OILA VA RUXSATLAR
 # =====================================================
-async def get_family_info(connection, user_id):
-    result = await connection.execute(
-        text("""
-            SELECT family_id, role
-            FROM family_members
-            WHERE telegram_user_id=:user_id
-        """),
-        {"user_id": user_id}
-    )
-
-    row = result.mappings().first()
-
-    return (
-        {"family_id": row["family_id"], "role": row["role"]}
-        if row else None
-    )
-
-
-async def get_family_id(connection, user_id):
-    info = await get_family_info(connection, user_id)
-    return info["family_id"] if info else None
-
-
-async def can_manage_transaction(connection, user_id, operation_id):
-    info = await get_family_info(connection, user_id)
-
-    result = await connection.execute(
-        text("""
-            SELECT id, telegram_user_id, family_id
-            FROM transactions
-            WHERE id=:operation_id
-        """),
-        {"operation_id": operation_id}
-    )
-
-    operation = result.mappings().first()
-
-    if not operation:
-        return False
-
-    if operation["telegram_user_id"] == user_id:
-        return True
-
-    return bool(
-        info
-        and info["role"] == "owner"
-        and operation["family_id"] == info["family_id"]
-    )
-
-
 def history_filter(info, user_id):
     if info and info["role"] == "owner":
         return (
             "(family_id=:family_id OR "
             "(telegram_user_id=:user_id AND family_id IS NULL))"
         )
-
     return "telegram_user_id=:user_id"
 
 
@@ -504,17 +610,7 @@ def report_filter(info, user_id):
              (telegram_user_id=:owner_id AND family_id IS NULL) OR
              (telegram_user_id=:user_id AND family_id IS NULL))
         """
-
     return "telegram_user_id=:user_id"
-
-
-def clear_user_states(user_id):
-    pending.pop(user_id, None)
-    editing.pop(user_id, None)
-    edit_pending.pop(user_id, None)
-    family_pending.pop(user_id, None)
-    date_flow.pop(user_id, None)
-    category_manage_pending.pop(user_id, None)
 
 
 @dp.message(CommandStart())
@@ -552,8 +648,168 @@ async def start(message: Message):
         )
 
 
+@dp.message(F.text == "👨‍👩‍👧‍👦 Оилам")
+async def family_home(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("""
+                UPDATE family_members
+                SET username=:username, full_name=:full_name
+                WHERE telegram_user_id=:user_id
+            """),
+            {
+                "user_id": user_id,
+                "username": message.from_user.username,
+                "full_name": get_user_full_name(message.from_user)
+            }
+        )
+
+        result = await connection.execute(
+            text("""
+                SELECT f.id, f.invite_code, fm.role
+                FROM family_members fm
+                JOIN families f ON f.id=fm.family_id
+                WHERE fm.telegram_user_id=:user_id
+            """),
+            {"user_id": user_id}
+        )
+        family = result.mappings().first()
+
+        if family:
+            members_result = await connection.execute(
+                text("""
+                    SELECT telegram_user_id, username,
+                           full_name, role
+                    FROM family_members
+                    WHERE family_id=:family_id
+                    ORDER BY id
+                """),
+                {"family_id": family["id"]}
+            )
+            members = members_result.mappings().all()
+        else:
+            members = []
+
+    if not family:
+        await message.answer(
+            "👨‍👩‍👧‍👦 ОИЛА БЎЛИМИ\n\n"
+            "Сиз ҳозирча бирор оилага қўшилмагансиз.\n"
+            "Оила яратишингиз ёки таклиф коди орқали "
+            "қўшилишингиз мумкин.",
+            reply_markup=family_action_keyboard()
+        )
+        return
+
+    members_text = ""
+    for index, member in enumerate(members, start=1):
+        role = (
+            "Оила бошлиғи"
+            if member["role"] == "owner"
+            else "Аъзо"
+        )
+        full_name = (
+            member["full_name"] or "Исми ҳали аниқланмаган"
+        )
+        username = (
+            f"@{member['username']}"
+            if member["username"] else "Username йўқ"
+        )
+        members_text += (
+            f"{index}. {full_name}\n"
+            f"   {username} — {role}\n"
+        )
+
+    await message.answer(
+        f"👨‍👩‍👧‍👦 ОИЛАМ\n\n"
+        f"Оила рақами: {family['id']}\n"
+        f"Таклиф коди: {family['invite_code']}\n\n"
+        f"👥 Аъзолар сони: {len(members)} та\n\n"
+        f"{members_text}",
+        reply_markup=main_keyboard()
+    )
+
+
+@dp.callback_query(F.data == "family_create")
+async def create_family(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    async with engine.begin() as connection:
+        existing = await get_family_info(connection, user_id)
+        if existing:
+            await callback.answer(
+                "Сиз аллақачон оила аъзосисиз!",
+                show_alert=True
+            )
+            return
+
+        invite_code = secrets.token_hex(4).upper()
+
+        result = await connection.execute(
+            text("""
+                INSERT INTO families
+                    (owner_telegram_user_id, invite_code)
+                VALUES (:user_id, :invite_code)
+                RETURNING id
+            """),
+            {
+                "user_id": user_id,
+                "invite_code": invite_code
+            }
+        )
+        family_id = result.scalar_one()
+
+        await connection.execute(
+            text("""
+                INSERT INTO family_members
+                    (family_id, telegram_user_id, role,
+                     username, full_name)
+                VALUES
+                    (:family_id, :user_id, 'owner',
+                     :username, :full_name)
+            """),
+            {
+                "family_id": family_id,
+                "user_id": user_id,
+                "username": callback.from_user.username,
+                "full_name": get_user_full_name(callback.from_user)
+            }
+        )
+
+    await callback.message.answer(
+        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
+        f"🔑 Таклиф коди: {invite_code}\n\n"
+        "Ушбу кодни оила аъзоларингизга юборинг.",
+        reply_markup=main_keyboard()
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "family_join")
+async def family_join(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    async with engine.connect() as connection:
+        existing = await get_family_info(connection, user_id)
+
+    if existing:
+        await callback.answer(
+            "Сиз аллақачон оила аъзосисиз!",
+            show_alert=True
+        )
+        return
+
+    family_pending[user_id] = True
+    await callback.message.answer(
+        "🔑 Оила таклиф кодини киритинг.\n\n"
+        "Масалан: A1B2C3D4"
+    )
+    await callback.answer()
+
+
 # =====================================================
-# KATEGORIYALAR BAZASI
+# KATEGORIYALAR
 # =====================================================
 def category_defaults(entry_type):
     return (
@@ -570,8 +826,6 @@ async def ensure_default_categories(
     owner_id = None if info else user_id
 
     for name in category_defaults(entry_type):
-        # Муҳим: фаол ёки нофаоллигидан қатъи назар текширамиз.
-        # Ўчирилган стандарт категория қайта пайдо бўлмайди.
         exists = await connection.execute(
             text("""
                 SELECT id
@@ -614,7 +868,6 @@ async def ensure_default_categories(
 async def get_categories(user_id, entry_type):
     async with engine.begin() as connection:
         info = await get_family_info(connection, user_id)
-
         await ensure_default_categories(
             connection, user_id, info, entry_type
         )
@@ -639,13 +892,11 @@ async def get_categories(user_id, entry_type):
                 "owner_id": owner_id
             }
         )
-
         return [row[0] for row in result.fetchall()]
 
 
 async def get_category_scope(connection, user_id):
     info = await get_family_info(connection, user_id)
-
     return (
         info,
         info["family_id"] if info else None,
@@ -656,7 +907,6 @@ async def get_category_scope(connection, user_id):
 @dp.message(F.text == "⚙️ Категориялар")
 async def category_home(message: Message):
     user_id = message.from_user.id
-
     category_manage_pending.pop(user_id, None)
     date_flow.pop(user_id, None)
 
@@ -671,16 +921,10 @@ async def category_home(message: Message):
 async def add_expense_category(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
     category_manage_pending[user_id] = "expense"
-
     await message.answer(
         "Янги харажат категорияси номини ёзинг.\n"
-        "Масалан: 🚘 Автомобиль таъмири",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="❌ Бекор қилиш")]],
-            resize_keyboard=True
-        )
+        "Масалан: 🚘 Автомобиль таъмири"
     )
 
 
@@ -688,16 +932,10 @@ async def add_expense_category(message: Message):
 async def add_income_category(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
     category_manage_pending[user_id] = "income"
-
     await message.answer(
         "Янги даромад категорияси номини ёзинг.\n"
-        "Масалан: 🏡 Ижара даромади",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="❌ Бекор қилиш")]],
-            resize_keyboard=True
-        )
+        "Масалан: 🏡 Ижара даромади"
     )
 
 
@@ -708,7 +946,6 @@ async def show_categories_to_delete(message, entry_type):
         info, family_id, owner_id = await get_category_scope(
             connection, user_id
         )
-
         await ensure_default_categories(
             connection, user_id, info, entry_type
         )
@@ -730,7 +967,6 @@ async def show_categories_to_delete(message, entry_type):
                 "owner_id": owner_id
             }
         )
-
         rows = result.mappings().all()
 
     if not rows:
@@ -740,22 +976,15 @@ async def show_categories_to_delete(message, entry_type):
         )
         return
 
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text=f"🗑 {row['name']}",
-                callback_data=f"catdel:{entry_type}:{row['id']}"
-            )
-        ]
-        for row in rows
-    ]
+    buttons = [[InlineKeyboardButton(
+        text=f"🗑 {row['name']}",
+        callback_data=f"catdel:{entry_type}:{row['id']}"
+    )] for row in rows]
 
     await message.answer(
         "Ўчирмоқчи бўлган категорияни танланг.\n\n"
         "Эслатма: эски операциялар тарихи сақланади.",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=buttons
-        )
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
     )
 
 
@@ -778,11 +1007,9 @@ async def delete_category(callback: CallbackQuery):
         await callback.answer("Нотўғри категория.", show_alert=True)
         return
 
-    user_id = callback.from_user.id
-
     async with engine.begin() as connection:
-        info, family_id, owner_id = await get_category_scope(
-            connection, user_id
+        _, family_id, owner_id = await get_category_scope(
+            connection, callback.from_user.id
         )
 
         result = await connection.execute(
@@ -806,8 +1033,7 @@ async def delete_category(callback: CallbackQuery):
 
     if result.rowcount:
         await callback.message.edit_text(
-            "✅ Категория ўчирилди. "
-            "Аввалги операциялар тарихи сақланди."
+            "✅ Категория ўчирилди. Аввалги операциялар тарихи сақланди."
         )
         await callback.answer("Категория ўчирилди.")
     else:
@@ -818,190 +1044,65 @@ async def delete_category(callback: CallbackQuery):
 
 
 # =====================================================
-# OILA BO'LIMI
+# HISOBOT VA TARIX
 # =====================================================
-@dp.message(F.text == "👨‍👩‍👧‍👦 Оилам")
-async def family_home(message: Message):
+@dp.message(F.text == "📈 Дашборд")
+async def open_dashboard(message: Message):
     user_id = message.from_user.id
 
+    clear_user_states(user_id)
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hash_token(token)
+
     async with engine.begin() as connection:
         await connection.execute(
             text("""
-                UPDATE family_members
-                SET username=:username, full_name=:full_name
-                WHERE telegram_user_id=:user_id
+                DELETE FROM dashboard_sessions
+                WHERE expires_at < NOW()
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                INSERT INTO dashboard_sessions
+                    (telegram_user_id, token_hash, expires_at)
+                VALUES
+                    (:user_id, :token_hash,
+                     NOW() + INTERVAL '7 days')
             """),
             {
                 "user_id": user_id,
-                "username": message.from_user.username,
-                "full_name": get_user_full_name(message.from_user)
+                "token_hash": token_hash
             }
         )
 
-        result = await connection.execute(
-            text("""
-                SELECT f.id, f.invite_code, fm.role
-                FROM family_members fm
-                JOIN families f ON f.id=fm.family_id
-                WHERE fm.telegram_user_id=:user_id
-            """),
-            {"user_id": user_id}
-        )
+    dashboard_link = f"{DASHBOARD_URL}/dashboard?token={token}"
 
-        family = result.mappings().first()
-
-        if family:
-            members_result = await connection.execute(
-                text("""
-                    SELECT telegram_user_id, username,
-                           full_name, role
-                    FROM family_members
-                    WHERE family_id=:family_id
-                    ORDER BY id
-                """),
-                {"family_id": family["id"]}
-            )
-
-            members = members_result.mappings().all()
-        else:
-            members = []
-
-    if not family:
-        await message.answer(
-            "👨‍👩‍👧‍👦 ОИЛА БЎЛИМИ\n\n"
-            "Сиз ҳозирча бирор оилага қўшилмагансиз.\n"
-            "Оила яратишингиз ёки таклиф коди орқали "
-            "қўшилишингиз мумкин.",
-            reply_markup=family_action_keyboard()
-        )
-        return
-
-    members_text = ""
-
-    for index, member in enumerate(members, start=1):
-        role = (
-            "Оила бошлиғи"
-            if member["role"] == "owner"
-            else "Аъзо"
-        )
-
-        full_name = (
-            member["full_name"]
-            or "Исми ҳали аниқланмаган"
-        )
-
-        username = (
-            f"@{member['username']}"
-            if member["username"] else "Username йўқ"
-        )
-
-        members_text += (
-            f"{index}. {full_name}\n"
-            f"   {username} — {role}\n"
-        )
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📈 Дашбордни очиш",
+                    url=dashboard_link
+                )
+            ]
+        ]
+    )
 
     await message.answer(
-        f"👨‍👩‍👧‍👦 ОИЛАМ\n\n"
-        f"Оила рақами: {family['id']}\n"
-        f"Таклиф коди: {family['invite_code']}\n\n"
-        f"👥 Аъзолар сони: {len(members)} та\n\n"
-        f"{members_text}",
-        reply_markup=main_keyboard()
+        "📈 FAMILY MONEY — ДАШБОРД\n\n"
+        "Даромадлар, харажатлар, оила аъзолари "
+        "ва қарзлар бўйича маълумотларни кўриш учун "
+        "қуйидаги тугмани босинг.\n\n"
+        "🔐 Ҳавола 7 кун давомида амал қилади.",
+        reply_markup=keyboard
     )
-
-
-@dp.callback_query(F.data == "family_create")
-async def create_family(callback: CallbackQuery):
-    user_id = callback.from_user.id
-
-    async with engine.begin() as connection:
-        existing = await get_family_info(connection, user_id)
-
-        if existing:
-            await callback.answer(
-                "Сиз аллақачон оила аъзосисиз!",
-                show_alert=True
-            )
-            return
-
-        invite_code = secrets.token_hex(4).upper()
-
-        result = await connection.execute(
-            text("""
-                INSERT INTO families
-                    (owner_telegram_user_id, invite_code)
-                VALUES (:user_id, :invite_code)
-                RETURNING id
-            """),
-            {
-                "user_id": user_id,
-                "invite_code": invite_code
-            }
-        )
-
-        family_id = result.scalar_one()
-
-        await connection.execute(
-            text("""
-                INSERT INTO family_members
-                    (family_id, telegram_user_id, role,
-                     username, full_name)
-                VALUES
-                    (:family_id, :user_id, 'owner',
-                     :username, :full_name)
-            """),
-            {
-                "family_id": family_id,
-                "user_id": user_id,
-                "username": callback.from_user.username,
-                "full_name": get_user_full_name(callback.from_user)
-            }
-        )
-
-    await callback.message.answer(
-        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
-        f"🔑 Таклиф коди: {invite_code}\n\n"
-        "Ушбу кодни оила аъзоларингизга юборинг.",
-        reply_markup=main_keyboard()
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "family_join")
-async def family_join(callback: CallbackQuery):
-    user_id = callback.from_user.id
-
-    async with engine.connect() as connection:
-        existing = await get_family_info(connection, user_id)
-
-    if existing:
-        await callback.answer(
-            "Сиз аллақачон оила аъзосисиз!",
-            show_alert=True
-        )
-        return
-
-    family_pending[user_id] = True
-
-    await callback.message.answer(
-        "🔑 Оила таклиф кодини киритинг.\n\n"
-        "Масалан: A1B2C3D4"
-    )
-
-    await callback.answer()
-
-
-# =====================================================
-# HISOBOT / TARIX DAVRINI TANLASH
-# =====================================================
-@dp.message(F.text == "📊 Ҳисобот")
+    @dp.message(F.text == "📊 Ҳисобот")
 async def report_menu(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
     date_flow[user_id] = "report"
-
     await message.answer(
         "Ҳисобот даврини танланг:",
         reply_markup=period_keyboard()
@@ -1012,9 +1113,7 @@ async def report_menu(message: Message):
 async def history_menu(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
     date_flow[user_id] = "history"
-
     await message.answer(
         "Тарих учун даврни танланг:",
         reply_markup=period_keyboard()
@@ -1026,14 +1125,10 @@ def get_period(period):
 
     if period == "📅 Бугун":
         return today, today, "Бугун"
-
     if period == "📆 Шу ой":
-        first = today.replace(day=1)
-        return first, today, "Шу ой"
-
+        return today.replace(day=1), today, "Шу ой"
     if period == "🗓 Шу йил":
-        first = today.replace(month=1, day=1)
-        return first, today, "Шу йил"
+        return today.replace(month=1, day=1), today, "Шу йил"
 
     return None, None, "Барча вақт"
 
@@ -1045,37 +1140,28 @@ def date_bounds(start_date, end_date):
     start_ts = datetime.combine(
         start_date, time.min, tzinfo=TZ
     )
-
     end_ts = datetime.combine(
         end_date + timedelta(days=1),
         time.min,
         tzinfo=TZ
     )
-
     return start_ts, end_ts
 
 
 async def show_history(
-    message,
-    start_date=None,
-    end_date=None,
-    period_label=""
+    message, start_date=None, end_date=None, period_label=""
 ):
     user_id = message.from_user.id
 
     async with engine.connect() as connection:
         info = await get_family_info(connection, user_id)
         condition = history_filter(info, user_id)
-
         params = {"user_id": user_id}
 
         if info and info["role"] == "owner":
             params["family_id"] = info["family_id"]
 
-        start_ts, end_ts = date_bounds(
-            start_date, end_date
-        )
-
+        start_ts, end_ts = date_bounds(start_date, end_date)
         date_sql = ""
 
         if start_ts:
@@ -1083,7 +1169,6 @@ async def show_history(
                 " AND created_at >= :start_ts "
                 "AND created_at < :end_ts"
             )
-
             params.update({
                 "start_ts": start_ts,
                 "end_ts": end_ts
@@ -1102,16 +1187,11 @@ async def show_history(
             """),
             params
         )
-
         rows = result.mappings().all()
 
     if not rows:
         await message.answer(
-            (
-                f"{period_label}\n"
-                "Ушбу даврда операциялар мавжуд эмас."
-            ) if period_label else
-            "Ҳозирча операциялар мавжуд эмас.",
+            f"{period_label}\nУшбу даврда операциялар мавжуд эмас.",
             reply_markup=main_keyboard()
         )
         return
@@ -1121,11 +1201,8 @@ async def show_history(
         if info and info["role"] == "owner"
         else "🧾 ОПЕРАЦИЯЛАР ТАРИХИ"
     )
-
     await message.answer(
-        f"{title}\n"
-        f"📅 Давр: {period_label}\n"
-        "(Охирги 10 та операция)"
+        f"{title}\n📅 Давр: {period_label}\n(Охирги 10 та операция)"
     )
 
     for r in rows:
@@ -1134,13 +1211,9 @@ async def show_history(
             if r["entry_type"] == "expense"
             else "➕ Даромад"
         )
-
         created = r["created_at"]
-
         if created.tzinfo is None:
-            created = created.replace(
-                tzinfo=ZoneInfo("UTC")
-            )
+            created = created.replace(tzinfo=ZoneInfo("UTC"))
 
         local_date = created.astimezone(TZ).strftime(
             "%d.%m.%Y %H:%M"
@@ -1151,8 +1224,8 @@ async def show_history(
             f"📅 Сана: {local_date}\n"
             f"📝 Номи: {r['item_name']}\n"
             f"📂 Категория: {r['category']}\n"
-            f"💵 Сумма: {r['amount']:,.0f} сўм"
-        ).replace(",", " ")
+            f"💵 Сумма: {money(r['amount'])} сўм"
+        )
 
         if info and info["role"] == "owner":
             async with engine.connect() as connection:
@@ -1164,7 +1237,6 @@ async def show_history(
                     """),
                     {"user_id": r["telegram_user_id"]}
                 )
-
                 member = member_result.mappings().first()
 
             if member:
@@ -1172,7 +1244,6 @@ async def show_history(
                     member["full_name"]
                     or str(r["telegram_user_id"])
                 )
-
                 member_username = (
                     f" (@{member['username']})"
                     if member["username"] else ""
@@ -1182,8 +1253,7 @@ async def show_history(
                 member_username = ""
 
             operation_text += (
-                f"\n👤 Киритган: "
-                f"{member_name}{member_username}"
+                f"\n👤 Киритган: {member_name}{member_username}"
             )
 
         keyboard = InlineKeyboardMarkup(
@@ -1198,30 +1268,21 @@ async def show_history(
                 )
             ]]
         )
-
-        await message.answer(
-            operation_text,
-            reply_markup=keyboard
-        )
+        await message.answer(operation_text, reply_markup=keyboard)
 
 
 async def show_report(
-    message,
-    start_date=None,
-    end_date=None,
-    period_label=""
+    message, start_date=None, end_date=None, period_label=""
 ):
     user_id = message.from_user.id
 
     async with engine.connect() as connection:
         info = await get_family_info(connection, user_id)
         condition = report_filter(info, user_id)
-
         params = {"user_id": user_id}
 
         if info:
             params["family_id"] = info["family_id"]
-
             owner_result = await connection.execute(
                 text("""
                     SELECT owner_telegram_user_id
@@ -1230,13 +1291,9 @@ async def show_report(
                 """),
                 {"family_id": info["family_id"]}
             )
-
             params["owner_id"] = owner_result.scalar()
 
-        start_ts, end_ts = date_bounds(
-            start_date, end_date
-        )
-
+        start_ts, end_ts = date_bounds(start_date, end_date)
         date_sql = ""
 
         if start_ts:
@@ -1244,7 +1301,6 @@ async def show_report(
                 " AND created_at >= :start_ts "
                 "AND created_at < :end_ts"
             )
-
             params.update({
                 "start_ts": start_ts,
                 "end_ts": end_ts
@@ -1263,39 +1319,30 @@ async def show_report(
             """),
             params
         )
-
         rows = result.mappings().all()
 
     incomes = sum(
-        r["total"] for r in rows
-        if r["entry_type"] == "income"
+        (r["total"] for r in rows if r["entry_type"] == "income"),
+        Decimal("0")
     )
-
     expenses = sum(
-        r["total"] for r in rows
-        if r["entry_type"] == "expense"
+        (r["total"] for r in rows if r["entry_type"] == "expense"),
+        Decimal("0")
     )
-
     income_count = sum(
-        r["count"] for r in rows
-        if r["entry_type"] == "income"
+        r["count"] for r in rows if r["entry_type"] == "income"
     )
-
     expense_count = sum(
-        r["count"] for r in rows
-        if r["entry_type"] == "expense"
+        r["count"] for r in rows if r["entry_type"] == "expense"
     )
 
     income_details = [
-        f"  • {r['category']}: {r['total']:,.0f} сўм"
-        for r in rows
-        if r["entry_type"] == "income"
+        f"  • {r['category']}: {money(r['total'])} сўм"
+        for r in rows if r["entry_type"] == "income"
     ]
-
     expense_details = [
-        f"  • {r['category']}: {r['total']:,.0f} сўм"
-        for r in rows
-        if r["entry_type"] == "expense"
+        f"  • {r['category']}: {money(r['total'])} сўм"
+        for r in rows if r["entry_type"] == "expense"
     ]
 
     title = (
@@ -1306,22 +1353,22 @@ async def show_report(
     report_text = (
         f"{title}\n"
         f"📅 Давр: {period_label}\n\n"
-        f"💰 Жами даромад: {incomes:,.0f} сўм\n"
+        f"💰 Жами даромад: {money(incomes)} сўм\n"
         f"➕ Даромадлар сони: {income_count} та\n\n"
         "💵 ДАРОМАДЛАР КАТЕГОРИЯСИ:\n"
         + (
             "\n".join(income_details)
             if income_details else "  Маълумот йўқ"
         )
-        + f"\n\n🛒 Жами харажат: {expenses:,.0f} сўм\n"
+        + f"\n\n🛒 Жами харажат: {money(expenses)} сўм\n"
         f"➖ Харажатлар сони: {expense_count} та\n\n"
         "📂 ХАРАЖАТЛАР КАТЕГОРИЯСИ:\n"
         + (
             "\n".join(expense_details)
             if expense_details else "  Маълумот йўқ"
         )
-        + f"\n\n💵 Қолдиқ: {incomes - expenses:,.0f} сўм"
-    ).replace(",", " ")
+        + f"\n\n💵 Қолдиқ: {money(incomes - expenses)} сўм"
+    )
 
     await message.answer(
         report_text,
@@ -1330,18 +1377,808 @@ async def show_report(
 
 
 # =====================================================
+# QARZLAR BO'LIMI
+# =====================================================
+async def debt_scope(connection, user_id):
+    info = await get_family_info(connection, user_id)
+    if info:
+        return info["family_id"], None
+    return None, user_id
+
+
+@dp.message(F.text == "💳 Қарзлар")
+async def debt_home(message: Message):
+    clear_user_states(message.from_user.id)
+    await message.answer(
+        "💳 ҚАРЗЛАР БЎЛИМИ\n\n"
+        "🤝 Берган қарзим — бошқа одам бизга қарздор.\n"
+        "📥 Олган қарзим — биз бошқа одамдан қарз олганмиз.\n\n"
+        "Керакли амални танланг.",
+        reply_markup=debt_keyboard()
+    )
+
+
+@dp.message(F.text == "🤝 Берган қарзим")
+async def debt_lent_start(message: Message):
+    user_id = message.from_user.id
+    clear_user_states(user_id)
+    debt_pending[user_id] = {
+        "direction": "lent",
+        "step": "name"
+    }
+    await message.answer(
+        "🤝 КИМГА ҚАРЗ БЕРДИНГИЗ?\n\n"
+        "Қарздор шахснинг исмини киритинг."
+    )
+
+
+@dp.message(F.text == "📥 Олган қарзим")
+async def debt_borrowed_start(message: Message):
+    user_id = message.from_user.id
+    clear_user_states(user_id)
+    debt_pending[user_id] = {
+        "direction": "borrowed",
+        "step": "name"
+    }
+    await message.answer(
+        "📥 КИМДАН ҚАРЗ ОЛДИНГИЗ?\n\n"
+        "Қарз берган шахснинг исмини киритинг."
+    )
+
+
+@dp.message(F.text == "📋 Қарзлар рўйхати")
+async def debt_list(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        family_id, solo_user_id = await debt_scope(
+            connection, user_id
+        )
+
+        if family_id is not None:
+            condition = "family_id=:family_id"
+            params = {"family_id": family_id}
+        else:
+            condition = (
+                "family_id IS NULL AND created_by=:user_id"
+            )
+            params = {"user_id": solo_user_id}
+
+        result = await connection.execute(
+            text(f"""
+                SELECT id, direction, person_name,
+                       original_amount, remaining_amount,
+                       created_at, closed_at
+                FROM debts
+                WHERE {condition}
+                ORDER BY
+                    CASE WHEN remaining_amount > 0 THEN 0 ELSE 1 END,
+                    created_at DESC
+                LIMIT 50
+            """),
+            params
+        )
+        debts = result.mappings().all()
+
+    if not debts:
+        await message.answer(
+            "Ҳозирча қарзлар рўйхати бўш.",
+            reply_markup=debt_keyboard()
+        )
+        return
+
+    await message.answer("📋 ҚАРЗЛАР РЎЙХАТИ")
+
+    for debt in debts:
+        direction = (
+            "🤝 Биз берган қарз"
+            if debt["direction"] == "lent"
+            else "📥 Биз олган қарз"
+        )
+        created = debt["created_at"]
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=ZoneInfo("UTC"))
+        date_text = created.astimezone(TZ).strftime("%d.%m.%Y")
+
+        status = (
+            "✅ Ёпилган"
+            if Decimal(debt["remaining_amount"]) <= 0
+            else "🟡 Очиқ"
+        )
+
+        body = (
+            f"{direction}\n"
+            f"👤 Шахс: {debt['person_name']}\n"
+            f"📅 Сана: {date_text}\n"
+            f"💵 Дастлабки сумма: {money(debt['original_amount'])} сўм\n"
+            f"💰 Қолдиқ: {money(debt['remaining_amount'])} сўм\n"
+            f"📌 Ҳолат: {status}"
+        )
+
+        buttons = []
+        if Decimal(debt["remaining_amount"]) > 0:
+            buttons.append(InlineKeyboardButton(
+                text="💸 Қисман қайтариш",
+                callback_data=f"debt_repay:{debt['id']}"
+            ))
+        buttons.append(InlineKeyboardButton(
+            text="📜 Тарих",
+            callback_data=f"debt_history:{debt['id']}"
+        ))
+
+        await message.answer(
+            body,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[buttons]
+            )
+        )
+
+
+@dp.message(F.text == "📜 Қарзлар тарихи")
+async def debt_history_all(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        family_id, solo_user_id = await debt_scope(
+            connection, user_id
+        )
+
+        if family_id is not None:
+            condition = "d.family_id=:family_id"
+            params = {"family_id": family_id}
+        else:
+            condition = (
+                "d.family_id IS NULL AND d.created_by=:user_id"
+            )
+            params = {"user_id": solo_user_id}
+
+        result = await connection.execute(
+            text(f"""
+                SELECT d.id, d.direction, d.person_name,
+                       d.original_amount, d.remaining_amount,
+                       d.created_at, d.closed_at,
+                       COALESCE(SUM(r.amount), 0) AS repaid
+                FROM debts d
+                LEFT JOIN debt_repayments r ON r.debt_id=d.id
+                WHERE {condition}
+                GROUP BY d.id
+                ORDER BY d.created_at DESC
+                LIMIT 50
+            """),
+            params
+        )
+        rows = result.mappings().all()
+
+    if not rows:
+        await message.answer(
+            "Қарзлар тарихи ҳозирча мавжуд эмас.",
+            reply_markup=debt_keyboard()
+        )
+        return
+
+    await message.answer("📜 ҚАРЗЛАР ТАРИХИ")
+
+    for row in rows:
+        direction = (
+            "Биз берган қарз"
+            if row["direction"] == "lent"
+            else "Биз олган қарз"
+        )
+        await message.answer(
+            f"👤 {row['person_name']}\n"
+            f"📌 {direction}\n"
+            f"💵 Дастлабки сумма: {money(row['original_amount'])} сўм\n"
+            f"💸 Қайтарилган: {money(row['repaid'])} сўм\n"
+            f"💰 Қолдиқ: {money(row['remaining_amount'])} сўм\n"
+            f"📅 Киритилган: {row['created_at'].astimezone(TZ).strftime('%d.%m.%Y') if row['created_at'].tzinfo else row['created_at'].strftime('%d.%m.%Y')}\n"
+            f"📌 Ҳолат: {'Ёпилган' if Decimal(row['remaining_amount']) <= 0 else 'Очиқ'}"
+        )
+
+
+@dp.callback_query(F.data.startswith("debt_repay:"))
+async def debt_repay_start(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    try:
+        debt_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри қарз рақами.", show_alert=True)
+        return
+
+    async with engine.connect() as connection:
+        family_id, solo_user_id = await debt_scope(
+            connection, user_id
+        )
+
+        if family_id is not None:
+            condition = "family_id=:family_id"
+            params = {"family_id": family_id, "id": debt_id}
+        else:
+            condition = (
+                "family_id IS NULL AND created_by=:user_id"
+            )
+            params = {"user_id": solo_user_id, "id": debt_id}
+
+        result = await connection.execute(
+            text(f"""
+                SELECT id, person_name, remaining_amount
+                FROM debts
+                WHERE id=:id AND {condition}
+            """),
+            params
+        )
+        debt = result.mappings().first()
+
+    if not debt or Decimal(debt["remaining_amount"]) <= 0:
+        await callback.answer(
+            "Очиқ қарз топилмади.",
+            show_alert=True
+        )
+        return
+
+    debt_pending[user_id] = {
+        "step": "repayment",
+        "debt_id": debt_id,
+        "remaining": str(debt["remaining_amount"])
+    }
+
+    await callback.message.answer(
+        f"💸 ҚАЙТАРИЛГАН СУММАНИ КИРИТИНГ\n\n"
+        f"Шахс: {debt['person_name']}\n"
+        f"Қолган қарз: {money(debt['remaining_amount'])} сўм\n\n"
+        "Қайтарилган суммани ёзинг."
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("debt_history:"))
+async def debt_history_one(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    try:
+        debt_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри қарз рақами.", show_alert=True)
+        return
+
+    async with engine.connect() as connection:
+        family_id, solo_user_id = await debt_scope(
+            connection, user_id
+        )
+
+        if family_id is not None:
+            condition = "d.family_id=:family_id"
+            params = {"family_id": family_id, "id": debt_id}
+        else:
+            condition = (
+                "d.family_id IS NULL AND d.created_by=:user_id"
+            )
+            params = {"user_id": solo_user_id, "id": debt_id}
+
+        debt_result = await connection.execute(
+            text(f"""
+                SELECT d.person_name, d.direction,
+                       d.original_amount, d.remaining_amount
+                FROM debts d
+                WHERE d.id=:id AND {condition}
+            """),
+            params
+        )
+        debt = debt_result.mappings().first()
+
+        if not debt:
+            await callback.answer("Қарз топилмади.", show_alert=True)
+            return
+
+        repayments_result = await connection.execute(
+            text("""
+                SELECT amount, created_at
+                FROM debt_repayments
+                WHERE debt_id=:debt_id
+                ORDER BY created_at DESC
+            """),
+            {"debt_id": debt_id}
+        )
+        repayments = repayments_result.mappings().all()
+
+    title = (
+        "🤝 Берилган қарз"
+        if debt["direction"] == "lent"
+        else "📥 Олинган қарз"
+    )
+
+    details = (
+        f"{title}\n"
+        f"👤 Шахс: {debt['person_name']}\n"
+        f"💵 Дастлабки сумма: {money(debt['original_amount'])} сўм\n"
+        f"💰 Қолдиқ: {money(debt['remaining_amount'])} сўм\n\n"
+        "📜 ҚАЙТАРИШЛАР:"
+    )
+
+    if repayments:
+        for item in repayments:
+            created = item["created_at"]
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=ZoneInfo("UTC"))
+            date_text = created.astimezone(TZ).strftime("%d.%m.%Y %H:%M")
+            details += (
+                f"\n• {date_text}: {money(item['amount'])} сўм"
+            )
+    else:
+        details += "\nҲали қайтариш амалга оширилмаган."
+
+    await callback.message.answer(details)
+    await callback.answer()
+
+# =====================================================
+# QARZLAR BO'LIMI
+# =====================================================
+
+def debt_menu_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🤝 Берган қарзим",
+                callback_data="debt_new:given"
+            )],
+            [InlineKeyboardButton(
+                text="📥 Олган қарзим",
+                callback_data="debt_new:taken"
+            )],
+            [InlineKeyboardButton(
+                text="📋 Қарзлар рўйхати",
+                callback_data="debt_list:active"
+            )],
+            [InlineKeyboardButton(
+                text="📚 Ёпилган қарзлар",
+                callback_data="debt_list:closed"
+            )]
+        ]
+    )
+
+
+def debt_amount(value):
+    try:
+        amount = Decimal(
+            str(value).replace(" ", "").replace(",", ".")
+        )
+        if not amount.is_finite() or amount <= 0:
+            return None
+        return amount
+    except (InvalidOperation, ValueError):
+        return None
+
+
+async def get_debt_scope(connection, user_id):
+    info = await get_family_info(connection, user_id)
+
+    if info:
+        return {
+            "family_id": info["family_id"],
+            "condition": "family_id=:family_id"
+        }
+
+    return {
+        "family_id": None,
+        "condition": (
+            "family_id IS NULL AND created_by=:user_id"
+        )
+    }
+
+
+@dp.message(F.text == "💳 Қарзлар")
+async def debt_home(message: Message):
+    clear_user_states(message.from_user.id)
+
+    await message.answer(
+        "💳 ҚАРЗЛАР БЎЛИМИ\n\n"
+        "🤝 Берган қарзим — бошқалар бизга қайтариши керак.\n"
+        "📥 Олган қарзим — биз бошқаларга қайтаришимиз керак.",
+        reply_markup=debt_menu_keyboard()
+    )
+
+
+@dp.callback_query(F.data.startswith("debt_new:"))
+async def debt_new(callback: CallbackQuery):
+    direction = callback.data.split(":")[1]
+
+    if direction not in ("given", "taken"):
+        await callback.answer("Нотўғри амал.", show_alert=True)
+        return
+
+    debt_pending[callback.from_user.id] = {
+        "direction": direction,
+        "step": "name"
+    }
+
+    if direction == "given":
+        question = "Кимга қарз бердингиз? Исмини киритинг."
+    else:
+        question = "Кимдан қарз олдингиз? Исмини киритинг."
+
+    await callback.message.answer(question)
+    await callback.answer()
+
+
+async def save_new_debt(message, data):
+    user_id = message.from_user.id
+
+    async with engine.begin() as connection:
+        info = await get_family_info(connection, user_id)
+        family_id = info["family_id"] if info else None
+
+        await connection.execute(
+            text("""
+                INSERT INTO debts (
+                    family_id, created_by, direction,
+                    person_name, original_amount,
+                    remaining_amount
+                )
+                VALUES (
+                    :family_id, :created_by, :direction,
+                    :person_name, :amount, :amount
+                )
+            """),
+            {
+                "family_id": family_id,
+                "created_by": user_id,
+                "direction": data["direction"],
+                "person_name": data["person_name"],
+                "amount": data["amount"]
+            }
+        )
+
+    debt_pending.pop(user_id, None)
+
+    await message.answer(
+        "✅ ҚАРЗ САҚЛАНДИ!\n\n"
+        f"Шахс: {data['person_name']}\n"
+        f"Сумма: {data['amount']:,.0f} сўм\n"
+        f"Қолдиқ: {data['amount']:,.0f} сўм".replace(",", " "),
+        reply_markup=main_keyboard()
+    )
+
+
+@dp.callback_query(F.data.startswith("debt_list:"))
+async def debt_list(callback: CallbackQuery):
+    status = callback.data.split(":")[1]
+
+    if status not in ("active", "closed"):
+        await callback.answer("Нотўғри сўров.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+
+    async with engine.connect() as connection:
+        scope = await get_debt_scope(connection, user_id)
+
+        condition = (
+            "remaining_amount > 0"
+            if status == "active"
+            else "remaining_amount <= 0"
+        )
+
+        result = await connection.execute(
+            text(f"""
+                SELECT id, direction, person_name,
+                       original_amount, remaining_amount,
+                       created_at
+                FROM debts
+                WHERE {scope['condition']}
+                  AND {condition}
+                ORDER BY created_at DESC
+                LIMIT 50
+            """),
+            {
+                "family_id": scope["family_id"],
+                "user_id": user_id
+            }
+        )
+
+        rows = result.mappings().all()
+
+    if not rows:
+        await callback.message.answer("Бу бўлимда қарзлар йўқ.")
+        await callback.answer()
+        return
+
+    await callback.message.answer(
+        "📋 ФАОЛ ҚАРЗЛАР" if status == "active"
+        else "📚 ЁПИЛГАН ҚАРЗЛАР"
+    )
+
+    for debt in rows:
+        direction = (
+            "🤝 Биз берган қарз"
+            if debt["direction"] == "given"
+            else "📥 Биз олган қарз"
+        )
+
+        created = debt["created_at"]
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=ZoneInfo("UTC"))
+
+        date_text = created.astimezone(TZ).strftime("%d.%m.%Y")
+
+        message_text = (
+            f"{direction}\n"
+            f"👤 Шахс: {debt['person_name']}\n"
+            f"📅 Сана: {date_text}\n"
+            f"💵 Бошланғич сумма: "
+            f"{float(debt['original_amount']):,.0f} сўм\n"
+            f"💰 Қолган қарз: "
+            f"{float(debt['remaining_amount']):,.0f} сўм"
+        ).replace(",", " ")
+
+        buttons = []
+
+        if status == "active":
+            buttons.append([
+                InlineKeyboardButton(
+                    text="💸 Қайтариш / тўлаш",
+                    callback_data=f"debt_repay:{debt['id']}"
+                )
+            ])
+
+        buttons.append([
+            InlineKeyboardButton(
+                text="📜 Қайтариш тарихи",
+                callback_data=f"debt_history:{debt['id']}"
+            )
+        ])
+
+        await callback.message.answer(
+            message_text,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=buttons
+            )
+        )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("debt_repay:"))
+async def debt_repay_start(callback: CallbackQuery):
+    try:
+        debt_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри қарз.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+
+    async with engine.connect() as connection:
+        scope = await get_debt_scope(connection, user_id)
+
+        result = await connection.execute(
+            text(f"""
+                SELECT id, person_name, remaining_amount
+                FROM debts
+                WHERE id=:debt_id
+                  AND {scope['condition']}
+                  AND remaining_amount > 0
+            """),
+            {
+                "debt_id": debt_id,
+                "family_id": scope["family_id"],
+                "user_id": user_id
+            }
+        )
+
+        debt = result.mappings().first()
+
+    if not debt:
+        await callback.answer("Қарз топилмади.", show_alert=True)
+        return
+
+    debt_pending[user_id] = {
+        "step": "repay",
+        "debt_id": debt_id
+    }
+
+    await callback.message.answer(
+        f"💸 Қанча сумма қайтарилди ёки тўланди?\n"
+        f"Шахс: {debt['person_name']}\n"
+        f"Қолган қарз: {float(debt['remaining_amount']):,.0f} сўм\n\n"
+        "Суммани киритинг.".replace(",", " ")
+    )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("debt_history:"))
+async def debt_history(callback: CallbackQuery):
+    try:
+        debt_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри қарз.", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+
+    async with engine.connect() as connection:
+        scope = await get_debt_scope(connection, user_id)
+
+        debt_result = await connection.execute(
+            text(f"""
+                SELECT id, person_name
+                FROM debts
+                WHERE id=:debt_id
+                  AND {scope['condition']}
+            """),
+            {
+                "debt_id": debt_id,
+                "family_id": scope["family_id"],
+                "user_id": user_id
+            }
+        )
+
+        debt = debt_result.mappings().first()
+
+        if not debt:
+            await callback.answer("Қарз топилмади.", show_alert=True)
+            return
+
+        result = await connection.execute(
+            text("""
+                SELECT amount, created_at
+                FROM debt_repayments
+                WHERE debt_id=:debt_id
+                ORDER BY created_at DESC
+            """),
+            {"debt_id": debt_id}
+        )
+
+        rows = result.mappings().all()
+
+    if not rows:
+        await callback.message.answer(
+            f"{debt['person_name']} бўйича қайтариш тарихи ҳали йўқ."
+        )
+    else:
+        lines = ["📜 ҚАЙТАРИШ ТАРИХИ", f"Шахс: {debt['person_name']}"]
+
+        for row in rows:
+            created = row["created_at"]
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=ZoneInfo("UTC"))
+
+            date_text = created.astimezone(TZ).strftime("%d.%m.%Y %H:%M")
+
+            lines.append(
+                f"• {date_text} — "
+                f"{float(row['amount']):,.0f} сўм".replace(",", " ")
+            )
+
+        await callback.message.answer("\n".join(lines))
+
+    await callback.answer()
+
+
+async def process_debt_message(message, data):
+    user_id = message.from_user.id
+    incoming = message.text.strip()
+
+    if data["step"] == "name":
+        if len(incoming) < 2 or len(incoming) > 100:
+            await message.answer("Исмни тўғри киритинг.")
+            return
+
+        data["person_name"] = incoming
+        data["step"] = "amount"
+
+        await message.answer("💵 Қарз суммасини киритинг.")
+        return
+
+    if data["step"] == "amount":
+        amount = debt_amount(incoming)
+
+        if amount is None:
+            await message.answer("Суммани тўғри киритинг.")
+            return
+
+        data["amount"] = amount
+        await save_new_debt(message, data)
+        return
+
+    if data["step"] == "repay":
+        amount = debt_amount(incoming)
+
+        if amount is None:
+            await message.answer("Суммани тўғри киритинг.")
+            return
+
+        debt_id = data["debt_id"]
+
+        async with engine.begin() as connection:
+            scope = await get_debt_scope(connection, user_id)
+
+            result = await connection.execute(
+                text(f"""
+                    SELECT id, remaining_amount
+                    FROM debts
+                    WHERE id=:debt_id
+                      AND {scope['condition']}
+                      AND remaining_amount > 0
+                    FOR UPDATE
+                """),
+                {
+                    "debt_id": debt_id,
+                    "family_id": scope["family_id"],
+                    "user_id": user_id
+                }
+            )
+
+            debt = result.mappings().first()
+
+            if not debt:
+                debt_pending.pop(user_id, None)
+                await message.answer(
+                    "Қарз топилмади.",
+                    reply_markup=main_keyboard()
+                )
+                return
+
+            remaining = Decimal(str(debt["remaining_amount"]))
+
+            if amount > remaining:
+                await message.answer(
+                    f"Сумма қолган қарздан кўп. Қолдиқ: "
+                    f"{float(remaining):,.0f} сўм".replace(",", " ")
+                )
+                return
+
+            new_remaining = remaining - amount
+
+            await connection.execute(
+                text("""
+                    INSERT INTO debt_repayments
+                        (debt_id, amount, paid_by)
+                    VALUES
+                        (:debt_id, :amount, :user_id)
+                """),
+                {
+                    "debt_id": debt_id,
+                    "amount": amount,
+                    "user_id": user_id
+                }
+            )
+
+            await connection.execute(
+                text("""
+                    UPDATE debts
+                    SET remaining_amount=:remaining,
+                        closed_at=CASE
+                            WHEN :remaining=0 THEN NOW()
+                            ELSE NULL
+                        END
+                    WHERE id=:debt_id
+                """),
+                {
+                    "remaining": new_remaining,
+                    "debt_id": debt_id
+                }
+            )
+
+        debt_pending.pop(user_id, None)
+
+        await message.answer(
+            (
+                "🎉 ҚАРЗ ТЎЛИҚ ЁПИЛДИ!"
+                if new_remaining == 0
+                else "✅ Қисман қайтариш сақланди."
+            )
+            + f"\nҚолган қарз: {float(new_remaining):,.0f} сўм".replace(",", " "),
+            reply_markup=main_keyboard()
+        )
+# =====================================================
 # XARAJAT VA DAROMAD KIRITISH
 # =====================================================
 @dp.message(F.text == "➕ Харажат киритиш")
 async def expense(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
-    pending[user_id] = {
-        "type": "expense",
-        "step": "amount"
-    }
-
+    pending[user_id] = {"type": "expense", "step": "amount"}
     await message.answer(
         "Харажат номини ва суммасини ёзинг.\n"
         "Масалан: Картошка 7000"
@@ -1352,12 +2189,7 @@ async def expense(message: Message):
 async def income(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
-
-    pending[user_id] = {
-        "type": "income",
-        "step": "amount"
-    }
-
+    pending[user_id] = {"type": "income", "step": "amount"}
     await message.answer(
         "Даромад номини ва суммасини ёзинг.\n"
         "Масалан: Маош 5000000"
@@ -1366,9 +2198,7 @@ async def income(message: Message):
 
 @dp.message(F.text == "❌ Бекор қилиш")
 async def cancel(message: Message):
-    user_id = message.from_user.id
-    clear_user_states(user_id)
-
+    clear_user_states(message.from_user.id)
     await message.answer(
         "Маълумот бекор қилинди.",
         reply_markup=main_keyboard()
@@ -1377,9 +2207,7 @@ async def cancel(message: Message):
 
 @dp.message(F.text == "⬅️ Асосий меню")
 async def back_main(message: Message):
-    user_id = message.from_user.id
-    clear_user_states(user_id)
-
+    clear_user_states(message.from_user.id)
     await message.answer(
         "Асосий меню.",
         reply_markup=main_keyboard()
@@ -1401,9 +2229,7 @@ async def confirm(message: Message):
     owner_id = None
 
     async with engine.begin() as connection:
-        family_id = await get_family_id(
-            connection, user_id
-        )
+        family_id = await get_family_id(connection, user_id)
 
         await connection.execute(
             text("""
@@ -1433,7 +2259,6 @@ async def confirm(message: Message):
                 """),
                 {"family_id": family_id}
             )
-
             owner_id = result.scalar()
 
     pending.pop(user_id, None)
@@ -1449,17 +2274,11 @@ async def confirm(message: Message):
             if data["type"] == "expense"
             else "➕ ДАРОМАД"
         )
-
-        full_name = get_user_full_name(
-            message.from_user
-        )
-
+        full_name = get_user_full_name(message.from_user)
         username = (
             f"@{message.from_user.username}"
-            if message.from_user.username
-            else "Username йўқ"
+            if message.from_user.username else "Username йўқ"
         )
-
         notification = (
             "🔔 ОИЛАДА ЯНГИ МАЪЛУМОТ!\n\n"
             f"{kind}\n"
@@ -1467,13 +2286,10 @@ async def confirm(message: Message):
             f"🔹 Username: {username}\n"
             f"📝 Номи: {data['name']}\n"
             f"📂 Категория: {data['category']}\n"
-            f"💵 Сумма: {float(data['amount']):,.0f} сўм"
-        ).replace(",", " ")
-
+            f"💵 Сумма: {money(data['amount'])} сўм"
+        )
         try:
-            await message.bot.send_message(
-                owner_id, notification
-            )
+            await message.bot.send_message(owner_id, notification)
         except Exception:
             pass
 
@@ -1481,26 +2297,46 @@ async def confirm(message: Message):
 # =====================================================
 # TAHRIRLASH VA O'CHIRISH
 # =====================================================
+async def can_manage_transaction(connection, user_id, operation_id):
+    info = await get_family_info(connection, user_id)
+
+    result = await connection.execute(
+        text("""
+            SELECT id, telegram_user_id, family_id
+            FROM transactions
+            WHERE id=:operation_id
+        """),
+        {"operation_id": operation_id}
+    )
+    operation = result.mappings().first()
+
+    if not operation:
+        return False
+
+    if operation["telegram_user_id"] == user_id:
+        return True
+
+    return bool(
+        info
+        and info["role"] == "owner"
+        and operation["family_id"] == info["family_id"]
+    )
+
+
 @dp.callback_query(F.data.startswith("edit:"))
 async def edit_operation(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        operation_id = int(
-            callback.data.split(":")[1]
-        )
+        operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer(
-            "Нотўғри операция!",
-            show_alert=True
-        )
+        await callback.answer("Нотўғри операция!", show_alert=True)
         return
 
     async with engine.connect() as connection:
         allowed = await can_manage_transaction(
             connection, user_id, operation_id
         )
-
         if allowed:
             result = await connection.execute(
                 text("""
@@ -1510,7 +2346,6 @@ async def edit_operation(callback: CallbackQuery):
                 """),
                 {"id": operation_id}
             )
-
             operation = result.mappings().first()
         else:
             operation = None
@@ -1523,12 +2358,10 @@ async def edit_operation(callback: CallbackQuery):
         return
 
     editing[user_id] = operation_id
-
     await callback.message.answer(
         "✏️ Янги ном ва суммани ёзинг.\n"
         "Масалан: Гўшт 160000"
     )
-
     await callback.answer()
 
 
@@ -1550,14 +2383,11 @@ async def confirm_edit(message: Message):
         allowed = await can_manage_transaction(
             connection, user_id, operation_id
         )
-
         if not allowed:
             edit_pending.pop(user_id, None)
             editing.pop(user_id, None)
-
             await message.answer(
-                "❌ Бу маълумотни ўзгартиришга "
-                "рухсатингиз йўқ.",
+                "❌ Бу маълумотни ўзгартиришга рухсатингиз йўқ.",
                 reply_markup=main_keyboard()
             )
             return
@@ -1577,7 +2407,6 @@ async def confirm_edit(message: Message):
 
     edit_pending.pop(user_id, None)
     editing.pop(user_id, None)
-
     await message.answer(
         "✅ Операция муваффақиятли янгиланди!",
         reply_markup=main_keyboard()
@@ -1589,14 +2418,9 @@ async def delete_operation(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        operation_id = int(
-            callback.data.split(":")[1]
-        )
+        operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer(
-            "Нотўғри операция!",
-            show_alert=True
-        )
+        await callback.answer("Нотўғри операция!", show_alert=True)
         return
 
     async with engine.connect() as connection:
@@ -1623,12 +2447,10 @@ async def delete_operation(callback: CallbackQuery):
             )
         ]]
     )
-
     await callback.message.answer(
         "⚠️ Ушбу операцияни ўчиришни тасдиқлайсизми?",
         reply_markup=keyboard
     )
-
     await callback.answer()
 
 
@@ -1637,50 +2459,36 @@ async def confirm_delete(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        operation_id = int(
-            callback.data.split(":")[1]
-        )
+        operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer(
-            "Нотўғри операция!",
-            show_alert=True
-        )
+        await callback.answer("Нотўғри операция!", show_alert=True)
         return
 
     async with engine.begin() as connection:
         allowed = await can_manage_transaction(
             connection, user_id, operation_id
         )
-
         result = (
             await connection.execute(
-                text("""
-                    DELETE FROM transactions
-                    WHERE id=:id
-                """),
+                text("DELETE FROM transactions WHERE id=:id"),
                 {"id": operation_id}
             )
             if allowed else None
         )
 
     if result and result.rowcount:
-        await callback.message.edit_text(
-            "✅ Операция ўчирилди."
-        )
+        await callback.message.edit_text("✅ Операция ўчирилди.")
     else:
         await callback.message.edit_text(
             "❌ Бу операцияни ўчиришга рухсатингиз йўқ "
             "ёки у топилмади."
         )
-
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("delete_no:"))
 async def cancel_delete(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "❌ Ўчириш бекор қилинди."
-    )
+    await callback.message.edit_text("❌ Ўчириш бекор қилинди.")
     await callback.answer()
 
 
@@ -1691,19 +2499,217 @@ async def cancel_delete(callback: CallbackQuery):
 async def messages(message: Message):
     user_id = message.from_user.id
     incoming = message.text.strip()
+    if user_id in debt_pending:
+        await process_debt_message(
+            message,
+            debt_pending[user_id]
+        )
+        return
+    # Қарз киритиш ва қисман қайтариш
+    debt_data = debt_pending.get(user_id)
+
+    if debt_data:
+        if debt_data["step"] == "name":
+            if len(incoming) < 2 or len(incoming) > 100:
+                await message.answer(
+                    "Исм 2 тадан 100 тагача белги бўлиши керак."
+                )
+                return
+
+            debt_data["person_name"] = incoming
+            debt_data["step"] = "amount"
+            await message.answer(
+                "Қарз суммасини киритинг.\n"
+                "Масалан: 500000"
+            )
+            return
+
+        if debt_data["step"] == "amount":
+            amount = parse_amount(incoming)
+            if amount is None:
+                await message.answer(
+                    "Суммани тўғри киритинг. Масалан: 500000"
+                )
+                return
+
+            debt_data["amount"] = amount
+            debt_data["step"] = "confirm"
+
+            direction_text = (
+                "Биз берган қарз"
+                if debt_data["direction"] == "lent"
+                else "Биз олган қарз"
+            )
+
+            await message.answer(
+                "📋 ҚАРЗ МАЪЛУМОТЛАРИ\n\n"
+                f"Тури: {direction_text}\n"
+                f"Шахс: {debt_data['person_name']}\n"
+                f"Сумма: {money(amount)} сўм\n\n"
+                "Сақлаш учун «✅ Қарзни сақлаш» тугмасини босинг.",
+                reply_markup=ReplyKeyboardMarkup(
+                    keyboard=[
+                        [KeyboardButton(text="✅ Қарзни сақлаш")],
+                        [KeyboardButton(text="❌ Бекор қилиш")]
+                    ],
+                    resize_keyboard=True
+                )
+            )
+            return
+
+        if debt_data["step"] == "repayment":
+            amount = parse_amount(incoming)
+            if amount is None:
+                await message.answer(
+                    "Қайтарилган суммани тўғри киритинг."
+                )
+                return
+
+            remaining = Decimal(debt_data["remaining"])
+            if amount > remaining:
+                await message.answer(
+                    f"Қайтариш суммаси қолган қарздан кўп.\n"
+                    f"Максимал сумма: {money(remaining)} сўм"
+                )
+                return
+
+            debt_id = debt_data["debt_id"]
+
+            async with engine.begin() as connection:
+                family_id, solo_user_id = await debt_scope(
+                    connection, user_id
+                )
+
+                if family_id is not None:
+                    condition = "family_id=:family_id"
+                    params = {
+                        "family_id": family_id,
+                        "id": debt_id
+                    }
+                else:
+                    condition = (
+                        "family_id IS NULL AND created_by=:user_id"
+                    )
+                    params = {
+                        "user_id": solo_user_id,
+                        "id": debt_id
+                    }
+
+                check = await connection.execute(
+                    text(f"""
+                        SELECT remaining_amount
+                        FROM debts
+                        WHERE id=:id AND {condition}
+                        FOR UPDATE
+                    """),
+                    params
+                )
+                current = check.scalar()
+
+                if current is None:
+                    debt_pending.pop(user_id, None)
+                    await message.answer(
+                        "Қарз топилмади.",
+                        reply_markup=debt_keyboard()
+                    )
+                    return
+
+                current = Decimal(current)
+                if amount > current:
+                    await message.answer(
+                        f"Қолган қарз: {money(current)} сўм. "
+                        "Суммани қайта киритинг."
+                    )
+                    debt_data["remaining"] = str(current)
+                    return
+
+                new_remaining = current - amount
+
+                await connection.execute(
+                    text("""
+                        INSERT INTO debt_repayments
+                            (debt_id, amount, paid_by)
+                        VALUES (:debt_id, :amount, :paid_by)
+                    """),
+                    {
+                        "debt_id": debt_id,
+                        "amount": amount,
+                        "paid_by": user_id
+                    }
+                )
+
+                await connection.execute(
+                    text("""
+                        UPDATE debts
+                        SET remaining_amount=:remaining,
+                            closed_at=CASE
+                                WHEN :remaining=0 THEN NOW()
+                                ELSE NULL
+                            END
+                        WHERE id=:debt_id
+                    """),
+                    {
+                        "remaining": new_remaining,
+                        "debt_id": debt_id
+                    }
+                )
+
+            debt_pending.pop(user_id, None)
+            await message.answer(
+                "✅ Қарз қайтарилиши сақланди!\n\n"
+                f"Қайтарилди: {money(amount)} сўм\n"
+                f"Қолдиқ: {money(new_remaining)} сўм\n"
+                + (
+                    "\n🎉 Қарз тўлиқ ёпилди!"
+                    if new_remaining == 0 else ""
+                ),
+                reply_markup=debt_keyboard()
+            )
+            return
+
+        if debt_data["step"] == "confirm":
+            if incoming != "✅ Қарзни сақлаш":
+                return
+
+            async with engine.begin() as connection:
+                family_id = await get_family_id(
+                    connection, user_id
+                )
+
+                await connection.execute(
+                    text("""
+                        INSERT INTO debts
+                            (family_id, created_by, direction,
+                             person_name, original_amount,
+                             remaining_amount)
+                        VALUES
+                            (:family_id, :created_by, :direction,
+                             :person_name, :amount, :amount)
+                    """),
+                    {
+                        "family_id": family_id,
+                        "created_by": user_id,
+                        "direction": debt_data["direction"],
+                        "person_name": debt_data["person_name"],
+                        "amount": debt_data["amount"]
+                    }
+                )
+
+            debt_pending.pop(user_id, None)
+            await message.answer(
+                "✅ Қарз маълумоти сақланди!",
+                reply_markup=debt_keyboard()
+            )
+            return
 
     # Оила таклиф коди
     if user_id in family_pending:
         invite_code = incoming.upper()
 
         async with engine.begin() as connection:
-            existing = await get_family_info(
-                connection, user_id
-            )
-
+            existing = await get_family_info(connection, user_id)
             if existing:
                 family_pending.pop(user_id, None)
-
                 await message.answer(
                     "Сиз аллақачон оила аъзосисиз!",
                     reply_markup=main_keyboard()
@@ -1718,7 +2724,6 @@ async def messages(message: Message):
                 """),
                 {"invite_code": invite_code}
             )
-
             family_id = result.scalar()
 
             if not family_id:
@@ -1741,14 +2746,11 @@ async def messages(message: Message):
                     "family_id": family_id,
                     "user_id": user_id,
                     "username": message.from_user.username,
-                    "full_name": get_user_full_name(
-                        message.from_user
-                    )
+                    "full_name": get_user_full_name(message.from_user)
                 }
             )
 
         family_pending.pop(user_id, None)
-
         await message.answer(
             "🎉 Сиз оилага муваффақиятли қўшилдингиз!",
             reply_markup=main_keyboard()
@@ -1760,9 +2762,7 @@ async def messages(message: Message):
         flow = date_flow[user_id]
 
         if flow.endswith("_custom"):
-            parts = re.split(
-                r"\s*[-–—]\s*", incoming
-            )
+            parts = re.split(r"\s*[-–—]\s*", incoming)
 
             if len(parts) != 2:
                 await message.answer(
@@ -1776,11 +2776,9 @@ async def messages(message: Message):
                 start_date = datetime.strptime(
                     parts[0], "%d.%m.%Y"
                 ).date()
-
                 end_date = datetime.strptime(
                     parts[1], "%d.%m.%Y"
                 ).date()
-
             except ValueError:
                 await message.answer(
                     "Сана нотўғри. Масалан: "
@@ -1796,7 +2794,6 @@ async def messages(message: Message):
                 return
 
             date_flow.pop(user_id, None)
-
             label = (
                 f"{start_date.strftime('%d.%m.%Y')} - "
                 f"{end_date.strftime('%d.%m.%Y')}"
@@ -1810,12 +2807,10 @@ async def messages(message: Message):
                 await show_history(
                     message, start_date, end_date, label
                 )
-
             return
 
         if incoming == "✍️ Бошқа давр":
             date_flow[user_id] = flow + "_custom"
-
             await message.answer(
                 "Бошланиш ва тугаш санасини киритинг:\n"
                 "ДД.ММ.ЙЙЙЙ - ДД.ММ.ЙЙЙЙ\n"
@@ -1825,7 +2820,6 @@ async def messages(message: Message):
 
         if incoming == "❌ Бекор қилиш":
             date_flow.pop(user_id, None)
-
             await message.answer(
                 "Бекор қилинди.",
                 reply_markup=main_keyboard()
@@ -1835,14 +2829,8 @@ async def messages(message: Message):
         if incoming == "📋 Барча вақт":
             start_date = end_date = None
             label = "Барча вақт"
-
-        elif incoming in (
-            "📅 Бугун", "📆 Шу ой", "🗓 Шу йил"
-        ):
-            start_date, end_date, label = get_period(
-                incoming
-            )
-
+        elif incoming in ("📅 Бугун", "📆 Шу ой", "🗓 Шу йил"):
+            start_date, end_date, label = get_period(incoming)
         else:
             await message.answer(
                 "Илтимос, даврни тугмалар орқали танланг.",
@@ -1851,16 +2839,10 @@ async def messages(message: Message):
             return
 
         date_flow.pop(user_id, None)
-
         if flow == "report":
-            await show_report(
-                message, start_date, end_date, label
-            )
+            await show_report(message, start_date, end_date, label)
         else:
-            await show_history(
-                message, start_date, end_date, label
-            )
-
+            await show_history(message, start_date, end_date, label)
         return
 
     # Янги категория номини қабул қилиш
@@ -1876,13 +2858,10 @@ async def messages(message: Message):
             return
 
         async with engine.begin() as connection:
-            info, family_id, owner_id = (
-                await get_category_scope(
-                    connection, user_id
-                )
+            _, family_id, owner_id = await get_category_scope(
+                connection, user_id
             )
 
-            # Фаол ва нофаол категорияни ҳам текширамиз.
             exists = await connection.execute(
                 text("""
                     SELECT id, is_active
@@ -1901,10 +2880,7 @@ async def messages(message: Message):
                     "name": name
                 }
             )
-
-            existing_category = (
-                exists.mappings().first()
-            )
+            existing_category = exists.mappings().first()
 
             if existing_category:
                 if existing_category["is_active"]:
@@ -1914,7 +2890,6 @@ async def messages(message: Message):
                     )
                     return
 
-                # Аввал ўчирилган бўлса, қайта фаоллаштирамиз.
                 await connection.execute(
                     text("""
                         UPDATE categories
@@ -1923,7 +2898,6 @@ async def messages(message: Message):
                     """),
                     {"id": existing_category["id"]}
                 )
-
             else:
                 await connection.execute(
                     text("""
@@ -1944,19 +2918,15 @@ async def messages(message: Message):
                 )
 
         category_manage_pending.pop(user_id, None)
-
         await message.answer(
-            f"✅ Категория қўшилди ёки қайта фаоллаштирилди:\n"
-            f"{name}",
+            f"✅ Категория қўшилди ёки қайта фаоллаштирилди:\n{name}",
             reply_markup=category_manage_keyboard()
         )
         return
 
     # Таҳрирлаш учун янги ном ва сумма
     if user_id in editing:
-        numbers = re.findall(
-            r"\d+(?:[.,]\d+)?", incoming
-        )
+        numbers = re.findall(r"\d+(?:[.,]\d+)?", incoming)
 
         if not numbers:
             await message.answer(
@@ -1966,11 +2936,7 @@ async def messages(message: Message):
             return
 
         amount = numbers[-1].replace(",", ".")
-
-        name = re.sub(
-            r"\d+(?:[.,]\d+)?", "", incoming
-        )
-
+        name = re.sub(r"\d+(?:[.,]\d+)?", "", incoming)
         name = re.sub(
             r"\b(сўм|сум|uzs)\b",
             "",
@@ -1979,9 +2945,7 @@ async def messages(message: Message):
         ).strip(" ,.-")
 
         if not name:
-            await message.answer(
-                "Операция номини ҳам киритинг."
-            )
+            await message.answer("Операция номини ҳам киритинг.")
             return
 
         edit_pending[user_id] = {
@@ -2001,7 +2965,6 @@ async def messages(message: Message):
 
     # Кутилаётган харажат ёки даромад
     data = pending.get(user_id)
-
     if not data:
         await message.answer(
             "Керакли бўлимни танланг.",
@@ -2010,9 +2973,7 @@ async def messages(message: Message):
         return
 
     if data.get("step") == "category":
-        categories = await get_categories(
-            user_id, data["type"]
-        )
+        categories = await get_categories(user_id, data["type"])
 
         if incoming not in categories:
             await message.answer(
@@ -2023,7 +2984,6 @@ async def messages(message: Message):
 
         data["category"] = incoming
         data["step"] = "confirm"
-
         kind = (
             "Харажат"
             if data["type"] == "expense"
@@ -2041,10 +3001,7 @@ async def messages(message: Message):
         )
         return
 
-    numbers = re.findall(
-        r"\d+(?:[.,]\d+)?", incoming
-    )
-
+    numbers = re.findall(r"\d+(?:[.,]\d+)?", incoming)
     if not numbers:
         await message.answer(
             "Суммани ҳам ёзинг. Масалан: Картошка 7000"
@@ -2052,11 +3009,7 @@ async def messages(message: Message):
         return
 
     amount = numbers[-1].replace(",", ".")
-
-    name = re.sub(
-        r"\d+(?:[.,]\d+)?", "", incoming
-    )
-
+    name = re.sub(r"\d+(?:[.,]\d+)?", "", incoming)
     name = re.sub(
         r"\b(сўм|сум|uzs)\b",
         "",
@@ -2072,10 +3025,7 @@ async def messages(message: Message):
     data["amount"] = amount
     data["step"] = "category"
 
-    categories = await get_categories(
-        user_id, data["type"]
-    )
-
+    categories = await get_categories(user_id, data["type"])
     await message.answer(
         "Қайси категорияга киради?",
         reply_markup=category_keyboard(categories)
@@ -2083,7 +3033,7 @@ async def messages(message: Message):
 
 
 # =====================================================
-# BOTNI ISHGA TUSHIRISH VA XAVFSIZ MIGRATSIYA
+# BOTNI ISHGA TUSHIRISH VA BAZA MIGRATSIYASI
 # =====================================================
 async def main():
     if not TOKEN:
@@ -2096,6 +3046,47 @@ async def main():
                     telegram_user_id BIGINT PRIMARY KEY,
                     status VARCHAR(20) NOT NULL DEFAULT 'pending',
                     requested_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        )
+                await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS dashboard_sessions (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_user_id BIGINT NOT NULL,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS debts (
+                    id BIGSERIAL PRIMARY KEY,
+                    family_id BIGINT NULL
+                        REFERENCES families(id) ON DELETE CASCADE,
+                    created_by BIGINT NOT NULL,
+                    direction VARCHAR(20) NOT NULL,
+                    person_name TEXT NOT NULL,
+                    original_amount NUMERIC(14,2) NOT NULL,
+                    remaining_amount NUMERIC(14,2) NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    closed_at TIMESTAMPTZ
+                )
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS debt_repayments (
+                    id BIGSERIAL PRIMARY KEY,
+                    debt_id BIGINT NOT NULL
+                        REFERENCES debts(id) ON DELETE CASCADE,
+                    amount NUMERIC(14,2) NOT NULL,
+                    paid_by BIGINT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
         )
@@ -2139,6 +3130,71 @@ async def main():
                     entry_type,
                     is_active
                 )
+            """)
+        )
+
+        # Dashboard login sessions
+        await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS dashboard_sessions (
+                    id BIGSERIAL PRIMARY KEY,
+                    telegram_user_id BIGINT NOT NULL,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_user
+                ON dashboard_sessions (telegram_user_id)
+            """)
+        )
+
+        # Qarzdorlik
+        await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS debts (
+                    id BIGSERIAL PRIMARY KEY,
+                    family_id BIGINT NULL
+                        REFERENCES families(id) ON DELETE CASCADE,
+                    created_by BIGINT NOT NULL,
+                    direction VARCHAR(20) NOT NULL,
+                    person_name TEXT NOT NULL,
+                    original_amount NUMERIC(14,2) NOT NULL,
+                    remaining_amount NUMERIC(14,2) NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    closed_at TIMESTAMPTZ
+                )
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE INDEX IF NOT EXISTS idx_debts_family
+                ON debts (family_id, created_by)
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS debt_repayments (
+                    id BIGSERIAL PRIMARY KEY,
+                    debt_id BIGINT NOT NULL
+                        REFERENCES debts(id) ON DELETE CASCADE,
+                    amount NUMERIC(14,2) NOT NULL,
+                    paid_by BIGINT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        )
+
+        await connection.execute(
+            text("""
+                CREATE INDEX IF NOT EXISTS idx_debt_repayments_debt
+                ON debt_repayments (debt_id, created_at)
             """)
         )
 

@@ -2,6 +2,7 @@
 import os
 import re
 import asyncio
+import secrets
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from aiogram import Bot, Dispatcher, F
@@ -57,8 +58,11 @@ engine = create_async_engine(
 TOKEN = os.getenv("BOT_TOKEN", "")
 
 dp = Dispatcher()
+
 pending = {}
 editing = {}
+family_pending = {}
+
 
 # ASOSIY MENYU
 def main_keyboard():
@@ -67,7 +71,8 @@ def main_keyboard():
             [KeyboardButton(text="➕ Харажат киритиш")],
             [KeyboardButton(text="💰 Даромад киритиш")],
             [KeyboardButton(text="📊 Ҳисобот")],
-            [KeyboardButton(text="🧾 Харажатлар тарихи")]
+            [KeyboardButton(text="🧾 Харажатлар тарихи")],
+            [KeyboardButton(text="👨‍👩‍👧‍👦 Оилам")]
         ],
         resize_keyboard=True
     )
@@ -111,10 +116,48 @@ confirm_keyboard = ReplyKeyboardMarkup(
 )
 
 
+# OILA TUGMALARI
+def family_action_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="➕ Оила яратиш",
+                    callback_data="family_create"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔑 Таклиф коди билан қўшилиш",
+                    callback_data="family_join"
+                )
+            ]
+        ]
+    )
+
+
+# FOYDALANUVCHINING OILASINI ANIQLASH
+async def get_family_id(connection, user_id):
+    result = await connection.execute(
+        text("""
+            SELECT family_id
+            FROM family_members
+            WHERE telegram_user_id = :user_id
+        """),
+        {"user_id": user_id}
+    )
+
+    return result.scalar()
+
+
 # START
 @dp.message(CommandStart())
 async def start(message: Message):
-    pending.pop(message.from_user.id, None)
+    user_id = message.from_user.id
+
+    pending.pop(user_id, None)
+    editing.pop(user_id, None)
+    family_pending.pop(user_id, None)
 
     await message.answer(
         "Салом! Family Money ботига хуш келибсиз! 🎉",
@@ -153,14 +196,197 @@ async def income(message: Message):
 # BEKOR QILISH
 @dp.message(F.text == "❌ Бекор қилиш")
 async def cancel(message: Message):
-    pending.pop(message.from_user.id, None)
+    user_id = message.from_user.id
+
+    pending.pop(user_id, None)
     editing.pop(user_id, None)
+    family_pending.pop(user_id, None)
 
     await message.answer(
         "Маълумот бекор қилинди.",
         reply_markup=main_keyboard()
     )
 
+
+# OILAM BO'LIMI
+@dp.message(F.text == "👨‍👩‍👧‍👦 Оилам")
+async def family_home(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT
+                    f.id,
+                    f.invite_code,
+                    fm.role
+                FROM family_members fm
+                JOIN families f ON f.id = fm.family_id
+                WHERE fm.telegram_user_id = :user_id
+            """),
+            {"user_id": user_id}
+        )
+
+        family = result.mappings().first()
+
+        if family:
+            members_result = await connection.execute(
+                text("""
+                    SELECT telegram_user_id, role
+                    FROM family_members
+                    WHERE family_id = :family_id
+                    ORDER BY id
+                """),
+                {"family_id": family["id"]}
+            )
+
+            members = members_result.mappings().all()
+        else:
+            members = []
+
+    if not family:
+        await message.answer(
+            "👨‍👩‍👧‍👦 ОИЛА БЎЛИМИ\n\n"
+            "Сиз ҳозирча бирор оилага қўшилмагансиз.\n"
+            "Оила яратишингиз ёки таклиф коди орқали қўшилишингиз мумкин.",
+            reply_markup=family_action_keyboard()
+        )
+        return
+
+    members_text = ""
+
+    for index, member in enumerate(members, start=1):
+        role = (
+            "Оила бошлиғи"
+            if member["role"] == "owner"
+            else "Аъзо"
+        )
+
+        members_text += (
+            f"{index}. Telegram ID: "
+            f"{member['telegram_user_id']} — {role}\n"
+        )
+
+    await message.answer(
+        "👨‍👩‍👧‍👦 ОИЛАМ\n\n"
+        f"Оила рақами: {family['id']}\n"
+        f"Таклиф коди: {family['invite_code']}\n\n"
+        f"👥 Аъзолар сони: {len(members)} та\n\n"
+        f"{members_text}\n"
+        "Янги аъзоларни таклиф коди орқали қўшишингиз мумкин.",
+        reply_markup=main_keyboard()
+    )
+
+
+# OILA YARATISH
+@dp.callback_query(F.data == "family_create")
+async def create_family(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    async with engine.begin() as connection:
+        existing = await connection.execute(
+            text("""
+                SELECT family_id
+                FROM family_members
+                WHERE telegram_user_id = :user_id
+            """),
+            {"user_id": user_id}
+        )
+
+        existing_family = existing.scalar()
+
+        if existing_family:
+            await callback.answer(
+                "Сиз аллақачон оила аъзосисиз!",
+                show_alert=True
+            )
+            return
+
+        invite_code = secrets.token_hex(4).upper()
+
+        result = await connection.execute(
+            text("""
+                INSERT INTO families (
+                    owner_telegram_user_id,
+                    invite_code
+                )
+                VALUES (
+                    :user_id,
+                    :invite_code
+                )
+                RETURNING id
+            """),
+            {
+                "user_id": user_id,
+                "invite_code": invite_code
+            }
+        )
+
+        family_id = result.scalar_one()
+
+        await connection.execute(
+            text("""
+                INSERT INTO family_members (
+                    family_id,
+                    telegram_user_id,
+                    role
+                )
+                VALUES (
+                    :family_id,
+                    :user_id,
+                    'owner'
+                )
+            """),
+            {
+                "family_id": family_id,
+                "user_id": user_id
+            }
+        )
+
+    await callback.message.answer(
+        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
+        f"🔑 Таклиф коди: {invite_code}\n\n"
+        "Ушбу кодни оила аъзоларингизга юборинг.\n"
+        "Улар код орқали оилангизга қўшилишлари мумкин.",
+        reply_markup=main_keyboard()
+    )
+
+    await callback.answer()
+
+
+# OILAGA QO'SHILISH
+@dp.callback_query(F.data == "family_join")
+async def family_join(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    async with engine.connect() as connection:
+        existing = await connection.execute(
+            text("""
+                SELECT family_id
+                FROM family_members
+                WHERE telegram_user_id = :user_id
+            """),
+            {"user_id": user_id}
+        )
+
+        if existing.scalar():
+            await callback.answer(
+                "Сиз аллақачон оила аъзосисиз!",
+                show_alert=True
+            )
+            return
+
+    family_pending[user_id] = True
+
+    await callback.message.answer(
+        "🔑 Оила таклиф кодини киритинг.\n\n"
+        "Масалан: A1B2C3D4"
+    )
+
+    await callback.answer()
+
+
+# XARAJATLAR TARIXI
 @dp.message(F.text == "🧾 Харажатлар тарихи")
 async def history(message: Message):
     user_id = message.from_user.id
@@ -230,6 +456,7 @@ async def history(message: Message):
             operation_text,
             reply_markup=keyboard
         )
+
 
 # HISOBOT
 @dp.message(F.text == "📊 Ҳисобот")
@@ -327,6 +554,8 @@ async def confirm(message: Message):
         return
 
     async with engine.begin() as connection:
+        family_id = await get_family_id(connection, user_id)
+
         await connection.execute(
             text("""
                 INSERT INTO transactions
@@ -335,14 +564,16 @@ async def confirm(message: Message):
                     entry_type,
                     item_name,
                     amount,
-                    category
+                    category,
+                    family_id
                 )
                 VALUES (
                     :user_id,
                     :entry_type,
                     :item_name,
                     :amount,
-                    :category
+                    :category,
+                    :family_id
                 )
             """),
             {
@@ -350,7 +581,8 @@ async def confirm(message: Message):
                 "entry_type": data["type"],
                 "item_name": data["name"],
                 "amount": data["amount"],
-                "category": data["category"]
+                "category": data["category"],
+                "family_id": family_id
             }
         )
 
@@ -376,12 +608,19 @@ async def edit_operation(callback: CallbackQuery):
                 WHERE id = :id
                   AND telegram_user_id = :user_id
             """),
-            {"id": operation_id, "user_id": user_id}
+            {
+                "id": operation_id,
+                "user_id": user_id
+            }
         )
+
         row = result.first()
 
     if not row:
-        await callback.answer("Операция топилмади!", show_alert=True)
+        await callback.answer(
+            "Операция топилмади!",
+            show_alert=True
+        )
         return
 
     editing[user_id] = operation_id
@@ -390,13 +629,38 @@ async def edit_operation(callback: CallbackQuery):
         "✏️ Янги ном ва суммани ёзинг.\n"
         "Масалан: Гўшт 160000"
     )
+
     await callback.answer()
 
 
 # OPERATSIYANI O'CHIRISH
 @dp.callback_query(F.data.startswith("delete:"))
 async def delete_operation(callback: CallbackQuery):
+    user_id = callback.from_user.id
     operation_id = int(callback.data.split(":")[1])
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT id
+                FROM transactions
+                WHERE id = :id
+                  AND telegram_user_id = :user_id
+            """),
+            {
+                "id": operation_id,
+                "user_id": user_id
+            }
+        )
+
+        row = result.first()
+
+    if not row:
+        await callback.answer(
+            "Операция топилмади!",
+            show_alert=True
+        )
+        return
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -417,6 +681,7 @@ async def delete_operation(callback: CallbackQuery):
         "⚠️ Ушбу операцияни ўчиришни тасдиқлайсизми?",
         reply_markup=keyboard
     )
+
     await callback.answer()
 
 
@@ -432,38 +697,128 @@ async def confirm_delete(callback: CallbackQuery):
                 WHERE id = :id
                   AND telegram_user_id = :user_id
             """),
-            {"id": operation_id, "user_id": user_id}
+            {
+                "id": operation_id,
+                "user_id": user_id
+            }
         )
 
     if result.rowcount:
-        await callback.message.edit_text("✅ Операция ўчирилди.")
+        await callback.message.edit_text(
+            "✅ Операция ўчирилди."
+        )
     else:
-        await callback.message.edit_text("Операция топилмади.")
+        await callback.message.edit_text(
+            "Операция топилмади."
+        )
 
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("delete_no:"))
 async def cancel_delete(callback: CallbackQuery):
-    await callback.message.edit_text("❌ Ўчириш бекор қилинди.")
+    await callback.message.edit_text(
+        "❌ Ўчириш бекор қилинди."
+    )
+
     await callback.answer()
+
 
 # MATN VA SUMMANI QABUL QILISH
 @dp.message(F.text)
 async def messages(message: Message):
     user_id = message.from_user.id
-        # TAHRIRLASH JARAYONI
+
+    # OILAGA TAKLIF KODI ORQALI QO'SHILISH
+    if user_id in family_pending:
+        invite_code = message.text.strip().upper()
+
+        async with engine.begin() as connection:
+            existing = await connection.execute(
+                text("""
+                    SELECT family_id
+                    FROM family_members
+                    WHERE telegram_user_id = :user_id
+                """),
+                {"user_id": user_id}
+            )
+
+            if existing.scalar():
+                family_pending.pop(user_id, None)
+
+                await message.answer(
+                    "Сиз аллақачон оила аъзосисиз!",
+                    reply_markup=main_keyboard()
+                )
+                return
+
+            result = await connection.execute(
+                text("""
+                    SELECT id
+                    FROM families
+                    WHERE invite_code = :invite_code
+                """),
+                {"invite_code": invite_code}
+            )
+
+            family_id = result.scalar()
+
+            if not family_id:
+                await message.answer(
+                    "❌ Таклиф коди нотўғри.\n"
+                    "Илтимос, кодни қайта киритинг."
+                )
+                return
+
+            await connection.execute(
+                text("""
+                    INSERT INTO family_members (
+                        family_id,
+                        telegram_user_id,
+                        role
+                    )
+                    VALUES (
+                        :family_id,
+                        :user_id,
+                        'member'
+                    )
+                """),
+                {
+                    "family_id": family_id,
+                    "user_id": user_id
+                }
+            )
+
+        family_pending.pop(user_id, None)
+
+        await message.answer(
+            "🎉 Сиз оилага муваффақиятли қўшилдингиз!",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    # TAHRIRLASH JARAYONI
     if user_id in editing:
-        numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text)
+        numbers = re.findall(
+            r"\d+(?:[.,]\d+)?",
+            message.text
+        )
 
         if not numbers:
             await message.answer(
-                "Суммани ҳам киритинг.\nМасалан: Гўшт 160000"
+                "Суммани ҳам киритинг.\n"
+                "Масалан: Гўшт 160000"
             )
             return
 
         amount = numbers[-1].replace(",", ".")
-        name = re.sub(r"\d+(?:[.,]\d+)?", "", message.text)
+
+        name = re.sub(
+            r"\d+(?:[.,]\d+)?",
+            "",
+            message.text
+        )
+
         name = re.sub(
             r"\b(сўм|сум|uzs)\b",
             "",
@@ -473,7 +828,8 @@ async def messages(message: Message):
 
         if not name:
             await message.answer(
-                "Операция номини ҳам киритинг.\nМасалан: Гўшт 160000"
+                "Операция номини ҳам киритинг.\n"
+                "Масалан: Гўшт 160000"
             )
             return
 
@@ -503,6 +859,8 @@ async def messages(message: Message):
             reply_markup=main_keyboard()
         )
         return
+
+    # KUTILAYOTGAN MA'LUMOT
     data = pending.get(user_id)
 
     if not data:

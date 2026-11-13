@@ -153,6 +153,61 @@ async def cancel(message: Message):
         reply_markup=main_keyboard()
     )
 
+@dp.message(F.text == "🧾 Харажатлар тарихи")
+async def history(message: Message):
+    user_id = message.from_user.id
+
+    async with engine.connect() as connection:
+        result = await connection.execute(
+            text("""
+                SELECT
+                    entry_type,
+                    item_name,
+                    amount,
+                    COALESCE(category, 'Категориясиз') AS category,
+                    created_at
+                FROM transactions
+                WHERE telegram_user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 10
+            """),
+            {"user_id": user_id}
+        )
+
+        rows = result.mappings().all()
+
+    if not rows:
+        await message.answer(
+            "Ҳозирча харажатлар ва даромадлар тарихи мавжуд эмас.",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    history_text = "🧾 ОХИРГИ 10 ТА ОПЕРАЦИЯ:\n\n"
+
+    for r in rows:
+        kind = (
+            "➖ Харажат"
+            if r["entry_type"] == "expense"
+            else "➕ Даромад"
+        )
+
+        date = r["created_at"].strftime("%d.%m.%Y %H:%M")
+
+        history_text += (
+            f"{kind}\n"
+            f"📅 Сана: {date}\n"
+            f"📝 Номи: {r['item_name']}\n"
+            f"📂 Категория: {r['category']}\n"
+            f"💵 Сумма: {r['amount']:,.0f} сўм\n"
+            "--------------------\n"
+        )
+
+    await message.answer(
+        history_text,
+        reply_markup=main_keyboard()
+    )
+
 
 # HISOBOT
 @dp.message(F.text == "📊 Ҳисобот")

@@ -1,3 +1,4 @@
+
 import os
 import re
 import asyncio
@@ -18,9 +19,6 @@ from aiogram.types import (
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 # =====================================================
@@ -775,7 +773,7 @@ async def create_family(callback: CallbackQuery):
         )
 
     await callback.message.answer(
-        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!!\n\n"
+        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
         f"🔑 Таклиф коди: {invite_code}\n\n"
         "Ушбу кодни оила аъзоларингизга юборинг.",
         reply_markup=main_keyboard()
@@ -921,7 +919,7 @@ async def add_expense_category(message: Message):
     category_manage_pending[user_id] = "expense"
     await message.answer(
         "Янги харажат категорияси номини ёзинг.\n"
-        "Масалан: 🚗 Автомобиль таъмири"
+        "Масалан: 🚘 Автомобиль таъмири"
     )
 
 
@@ -932,7 +930,7 @@ async def add_income_category(message: Message):
     category_manage_pending[user_id] = "income"
     await message.answer(
         "Янги даромад категорияси номини ёзинг.\n"
-        "Масалан: 🏠 Ижара даромади"
+        "Масалан: 🏡 Ижара даромади"
     )
 
 
@@ -1307,7 +1305,7 @@ async def show_report(
         )
         + f"\n\n🛒 Жами харажат: {money(expenses)} сўм\n"
         f"➖ Харажатлар сони: {expense_count} та\n\n"
-        "🛒 ХАРАЖАТЛАР КАТЕГОРИЯСИ:\n"
+        "📂 ХАРАЖАТЛАР КАТЕГОРИЯСИ:\n"
         + (
             "\n".join(expense_details)
             if expense_details else "  Маълумот йўқ"
@@ -1495,7 +1493,7 @@ async def debt_list(callback: CallbackQuery):
 
     await callback.message.answer(
         "📋 ФАОЛ ҚАРЗЛАР" if status == "active"
-        else "📚 БЕРИЛГАН ҚАРЗЛАР"
+        else "📚 ЁПИЛГАН ҚАРЗЛАР"
     )
 
     for debt in rows:
@@ -1760,7 +1758,7 @@ async def process_debt_message(message, data):
                     UPDATE debts
                     SET remaining_amount=:remaining,
                         closed_at=CASE
-                            WHEN :remaining=0 THEN NOW()
+                            WHEN CAST(:remaining AS NUMERIC) = 0::NUMERIC THEN NOW()
                             ELSE NULL
                         END
                     WHERE id=:debt_id
@@ -2116,7 +2114,7 @@ async def messages(message: Message):
             debt_pending[user_id]
         )
         return
-    # РћРёР»Р° С‚Р°РєР»РёС„ РєРѕРґРё
+    # Оила таклиф коди
     if user_id in family_pending:
         invite_code = incoming.upper()
 
@@ -2171,7 +2169,7 @@ async def messages(message: Message):
         )
         return
 
-    # РЎР°РЅР° РґР°РІСЂРёРЅРё С‚Р°РЅР»Р°С€
+    # Сана даврини танлаш
     if user_id in date_flow:
         flow = date_flow[user_id]
 
@@ -2259,7 +2257,7 @@ async def messages(message: Message):
             await show_history(message, start_date, end_date, label)
         return
 
-    # РЇРЅРіРё РєР°С‚РµРіРѕСЂРёСЏ РЅРѕРјРёРЅРё Т›Р°Р±СѓР» Т›РёР»РёС€
+    # Янги категория номини қабул қилиш
     if user_id in category_manage_pending:
         entry_type = category_manage_pending[user_id]
         name = incoming.strip()
@@ -2338,7 +2336,7 @@ async def messages(message: Message):
         )
         return
 
-    # РўР°ТіСЂРёСЂР»Р°С€ СѓС‡СѓРЅ СЏРЅРіРё РЅРѕРј РІР° СЃСѓРјРјР°
+    # Таҳрирлаш учун янги ном ва сумма
     if user_id in editing:
         numbers = re.findall(r"\d+(?:[.,]\d+)?", incoming)
 
@@ -2377,7 +2375,7 @@ async def messages(message: Message):
         )
         return
 
-    # РљСѓС‚РёР»Р°С‘С‚РіР°РЅ С…Р°СЂР°Р¶Р°С‚ С‘РєРё РґР°СЂРѕРјР°Рґ
+    # Кутилаётган харажат ёки даромад
     data = pending.get(user_id)
     if not data:
         await message.answer(

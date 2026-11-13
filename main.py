@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.bot import main as run_bot
+from bot import main as run_bot
 
 
 @asynccontextmanager

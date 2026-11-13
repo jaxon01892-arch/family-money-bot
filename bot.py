@@ -38,27 +38,23 @@ def hash_token(token):
 
 
 debt_pending = {}
-DASHBOARD_URL = os.getenv(
-    "DASHBOARD_URL",
-    "https://family-money-bot-1.onrender.com"
-).rstrip("/")
 
 EXPENSE_DEFAULTS = [
-    "🥩 Озиқ-овқат", "🚗 Транспорт", "🏠 Уй-рўзғор",
-    "💊 Соғлиқ", "👕 Кийим-кечак", "📚 Таълим",
-    "📦 Бошқа харажат"
+    "рџҐ© РћР·РёТ›-РѕРІТ›Р°С‚", "рџљ— РўСЂР°РЅСЃРїРѕСЂС‚", "рџЏ  РЈР№-СЂСћР·Т“РѕСЂ",
+    "рџ’Љ РЎРѕТ“Р»РёТ›", "рџ‘• РљРёР№РёРј-РєРµС‡Р°Рє", "рџ“љ РўР°СЉР»РёРј",
+    "рџ“¦ Р‘РѕС€Т›Р° С…Р°СЂР°Р¶Р°С‚"
 ]
 
 INCOME_DEFAULTS = [
-    "💼 Маош", "💰 Қўшимча даромад",
-    "🎁 Совға", "📦 Бошқа даромад"
+    "рџ’ј РњР°РѕС€", "рџ’° ТљСћС€РёРјС‡Р° РґР°СЂРѕРјР°Рґ",
+    "рџЋЃ РЎРѕРІТ“Р°", "рџ“¦ Р‘РѕС€Т›Р° РґР°СЂРѕРјР°Рґ"
 ]
 
 
 def get_database_url():
     url = os.getenv("DATABASE_URL")
     if not url:
-        raise RuntimeError("DATABASE_URL киритилмаган!")
+        raise RuntimeError("DATABASE_URL РєРёСЂРёС‚РёР»РјР°РіР°РЅ!")
 
     parts = urlsplit(url)
     query = [
@@ -87,7 +83,6 @@ edit_pending = {}
 family_pending = {}
 date_flow = {}
 category_manage_pending = {}
-debt_pending = {}
 
 
 # =====================================================
@@ -155,20 +150,20 @@ def main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="➕ Харажат киритиш"),
-                KeyboardButton(text="💰 Даромад киритиш")
+                KeyboardButton(text="вћ• РҐР°СЂР°Р¶Р°С‚ РєРёСЂРёС‚РёС€"),
+                KeyboardButton(text="рџ’° Р”Р°СЂРѕРјР°Рґ РєРёСЂРёС‚РёС€")
             ],
             [
-                KeyboardButton(text="📊 Ҳисобот"),
-                KeyboardButton(text="📈 Дашборд")
+                KeyboardButton(text="рџ“Љ ТІРёСЃРѕР±РѕС‚"),
+                KeyboardButton(text="рџ“€ Р”Р°С€Р±РѕСЂРґ")
             ],
             [
-                KeyboardButton(text="🧾 Харажатлар тарихи"),
-                KeyboardButton(text="💳 Қарзлар")
+                KeyboardButton(text="рџ§ѕ РҐР°СЂР°Р¶Р°С‚Р»Р°СЂ С‚Р°СЂРёС…Рё"),
+                KeyboardButton(text="рџ’і ТљР°СЂР·Р»Р°СЂ")
             ],
             [
-                KeyboardButton(text="⚙️ Категориялар"),
-                KeyboardButton(text="👨‍👩‍👧‍👦 Оилам")
+                KeyboardButton(text="вљ™пёЏ РљР°С‚РµРіРѕСЂРёСЏР»Р°СЂ"),
+                KeyboardButton(text="рџ‘ЁвЂЌрџ‘©вЂЌрџ‘§вЂЌрџ‘¦ РћРёР»Р°Рј")
             ]
         ],
         resize_keyboard=True
@@ -178,7 +173,7 @@ def category_keyboard(categories):
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=item)] for item in categories
-        ] + [[KeyboardButton(text="❌ Бекор қилиш")]],
+        ] + [[KeyboardButton(text="вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€")]],
         resize_keyboard=True
     )
 
@@ -187,15 +182,15 @@ def period_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="📅 Бугун"),
-                KeyboardButton(text="📆 Шу ой")
+                KeyboardButton(text="рџ“… Р‘СѓРіСѓРЅ"),
+                KeyboardButton(text="рџ“† РЁСѓ РѕР№")
             ],
             [
-                KeyboardButton(text="🗓 Шу йил"),
-                KeyboardButton(text="✍️ Бошқа давр")
+                KeyboardButton(text="рџ—“ РЁСѓ Р№РёР»"),
+                KeyboardButton(text="вњЌпёЏ Р‘РѕС€Т›Р° РґР°РІСЂ")
             ],
-            [KeyboardButton(text="📋 Барча вақт")],
-            [KeyboardButton(text="❌ Бекор қилиш")]
+            [KeyboardButton(text="рџ“‹ Р‘Р°СЂС‡Р° РІР°Т›С‚")],
+            [KeyboardButton(text="вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€")]
         ],
         resize_keyboard=True
     )
@@ -204,11 +199,11 @@ def period_keyboard():
 def category_manage_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="➕ Харажат категорияси қўшиш")],
-            [KeyboardButton(text="➖ Харажат категориясини ўчириш")],
-            [KeyboardButton(text="➕ Даромад категорияси қўшиш")],
-            [KeyboardButton(text="➖ Даромад категориясини ўчириш")],
-            [KeyboardButton(text="⬅️ Асосий меню")]
+            [KeyboardButton(text="вћ• РҐР°СЂР°Р¶Р°С‚ РєР°С‚РµРіРѕСЂРёСЏСЃРё Т›СћС€РёС€")],
+            [KeyboardButton(text="вћ– РҐР°СЂР°Р¶Р°С‚ РєР°С‚РµРіРѕСЂРёСЏСЃРёРЅРё СћС‡РёСЂРёС€")],
+            [KeyboardButton(text="вћ• Р”Р°СЂРѕРјР°Рґ РєР°С‚РµРіРѕСЂРёСЏСЃРё Т›СћС€РёС€")],
+            [KeyboardButton(text="вћ– Р”Р°СЂРѕРјР°Рґ РєР°С‚РµРіРѕСЂРёСЏСЃРёРЅРё СћС‡РёСЂРёС€")],
+            [KeyboardButton(text="в¬…пёЏ РђСЃРѕСЃРёР№ РјРµРЅСЋ")]
         ],
         resize_keyboard=True
     )
@@ -217,11 +212,11 @@ def category_manage_keyboard():
 def debt_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🤝 Берган қарзим")],
-            [KeyboardButton(text="📥 Олган қарзим")],
-            [KeyboardButton(text="📋 Қарзлар рўйхати")],
-            [KeyboardButton(text="📜 Қарзлар тарихи")],
-            [KeyboardButton(text="⬅️ Асосий меню")]
+            [KeyboardButton(text="рџ¤ќ Р‘РµСЂРіР°РЅ Т›Р°СЂР·РёРј")],
+            [KeyboardButton(text="рџ“Ґ РћР»РіР°РЅ Т›Р°СЂР·РёРј")],
+            [KeyboardButton(text="рџ“‹ ТљР°СЂР·Р»Р°СЂ СЂСћР№С…Р°С‚Рё")],
+            [KeyboardButton(text="рџ“њ ТљР°СЂР·Р»Р°СЂ С‚Р°СЂРёС…Рё")],
+            [KeyboardButton(text="в¬…пёЏ РђСЃРѕСЃРёР№ РјРµРЅСЋ")]
         ],
         resize_keyboard=True
     )
@@ -229,16 +224,16 @@ def debt_keyboard():
 
 confirm_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="✅ Тасдиқлаш")],
-        [KeyboardButton(text="❌ Бекор қилиш")]
+        [KeyboardButton(text="вњ… РўР°СЃРґРёТ›Р»Р°С€")],
+        [KeyboardButton(text="вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€")]
     ],
     resize_keyboard=True
 )
 
 edit_confirm_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="✅ Ўзгаришни тасдиқлаш")],
-        [KeyboardButton(text="❌ Бекор қилиш")]
+        [KeyboardButton(text="вњ… РЋР·РіР°СЂРёС€РЅРё С‚Р°СЃРґРёТ›Р»Р°С€")],
+        [KeyboardButton(text="вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€")]
     ],
     resize_keyboard=True
 )
@@ -248,11 +243,11 @@ def family_action_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
-                text="➕ Оила яратиш",
+                text="вћ• РћРёР»Р° СЏСЂР°С‚РёС€",
                 callback_data="family_create"
             )],
             [InlineKeyboardButton(
-                text="🔑 Таклиф коди билан қўшилиш",
+                text="рџ”‘ РўР°РєР»РёС„ РєРѕРґРё Р±РёР»Р°РЅ Т›СћС€РёР»РёС€",
                 callback_data="family_join"
             )]
         ]
@@ -337,17 +332,17 @@ async def request_access(user, bot, retry_rejected=False):
         full_name = get_user_full_name(user)
         username = (
             f"@{user.username}"
-            if user.username else "Username мавжуд эмас"
+            if user.username else "Username РјР°РІР¶СѓРґ СЌРјР°СЃ"
         )
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[[
                 InlineKeyboardButton(
-                    text="✅ Рухсат бериш",
+                    text="вњ… Р СѓС…СЃР°С‚ Р±РµСЂРёС€",
                     callback_data=f"access_approve:{user_id}"
                 ),
                 InlineKeyboardButton(
-                    text="❌ Рад этиш",
+                    text="вќЊ Р Р°Рґ СЌС‚РёС€",
                     callback_data=f"access_reject:{user_id}"
                 )
             ]]
@@ -356,11 +351,11 @@ async def request_access(user, bot, retry_rejected=False):
         try:
             await bot.send_message(
                 ADMIN_ID,
-                "🔔 БОТГА ЯНГИ ҚЎШИЛИШ СЎРОВИ\n\n"
-                f"👤 Исми: {full_name or 'Кўрсатилмаган'}\n"
-                f"🔹 Username: {username}\n"
-                f"🆔 Telegram ID: {user_id}\n\n"
-                "Ушбу фойдаланувчига рухсат берасизми?",
+                "рџ”” Р‘РћРўР“Рђ РЇРќР“Р ТљРЋРЁРР›РРЁ РЎРЋР РћР’Р\n\n"
+                f"рџ‘¤ РСЃРјРё: {full_name or 'РљСћСЂСЃР°С‚РёР»РјР°РіР°РЅ'}\n"
+                f"рџ”№ Username: {username}\n"
+                f"рџ†” Telegram ID: {user_id}\n\n"
+                "РЈС€Р±Сѓ С„РѕР№РґР°Р»Р°РЅСѓРІС‡РёРіР° СЂСѓС…СЃР°С‚ Р±РµСЂР°СЃРёР·РјРё?",
                 reply_markup=keyboard
             )
         except Exception:
@@ -399,25 +394,25 @@ class AccessMiddleware(BaseMiddleware):
         if status == "rejected":
             if isinstance(event, Message):
                 await event.answer(
-                    "❌ Сизнинг ботдан фойдаланиш "
-                    "сўровингиз рад этилган."
+                    "вќЊ РЎРёР·РЅРёРЅРі Р±РѕС‚РґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€ "
+                    "СЃСћСЂРѕРІРёРЅРіРёР· СЂР°Рґ СЌС‚РёР»РіР°РЅ."
                 )
             elif isinstance(event, CallbackQuery):
                 await event.answer(
-                    "Сизга ботдан фойдаланишга рухсат берилмаган.",
+                    "РЎРёР·РіР° Р±РѕС‚РґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€РіР° СЂСѓС…СЃР°С‚ Р±РµСЂРёР»РјР°РіР°РЅ.",
                     show_alert=True
                 )
             return
 
         if isinstance(event, Message):
             await event.answer(
-                "⏳ Ботдан фойдаланиш учун администратор "
-                "рухсатини кутишингиз керак.\n\n"
-                "Сўровингиз администраторга юборилди."
+                "вЏі Р‘РѕС‚РґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€ СѓС‡СѓРЅ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ "
+                "СЂСѓС…СЃР°С‚РёРЅРё РєСѓС‚РёС€РёРЅРіРёР· РєРµСЂР°Рє.\n\n"
+                "РЎСћСЂРѕРІРёРЅРіРёР· Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРіР° СЋР±РѕСЂРёР»РґРё."
             )
         elif isinstance(event, CallbackQuery):
             await event.answer(
-                "Администратор рухсатини кутинг.",
+                "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ СЂСѓС…СЃР°С‚РёРЅРё РєСѓС‚РёРЅРі.",
                 show_alert=True
             )
         return
@@ -427,7 +422,7 @@ class AccessMiddleware(BaseMiddleware):
 async def approve_access(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer(
-            "Бу амални фақат администратор бажара олади!",
+            "Р‘Сѓ Р°РјР°Р»РЅРё С„Р°Т›Р°С‚ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ Р±Р°Р¶Р°СЂР° РѕР»Р°РґРё!",
             show_alert=True
         )
         return
@@ -435,7 +430,7 @@ async def approve_access(callback: CallbackQuery):
     try:
         user_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри сўров!", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё СЃСћСЂРѕРІ!", show_alert=True)
         return
 
     async with engine.begin() as connection:
@@ -453,20 +448,20 @@ async def approve_access(callback: CallbackQuery):
         try:
             await callback.bot.send_message(
                 user_id,
-                "✅ Сизга Family Money ботидан "
-                "фойдаланишга рухсат берилди!\n\n"
-                "/start буйруғини босинг."
+                "вњ… РЎРёР·РіР° Family Money Р±РѕС‚РёРґР°РЅ "
+                "С„РѕР№РґР°Р»Р°РЅРёС€РіР° СЂСѓС…СЃР°С‚ Р±РµСЂРёР»РґРё!\n\n"
+                "/start Р±СѓР№СЂСѓТ“РёРЅРё Р±РѕСЃРёРЅРі."
             )
         except Exception:
             pass
 
         await callback.message.edit_text(
-            callback.message.text + "\n\n✅ РУХСАТ БЕРИЛДИ"
+            callback.message.text + "\n\nвњ… Р РЈРҐРЎРђРў Р‘Р•Р РР›Р”Р"
         )
-        await callback.answer("Фойдаланувчига рухсат берилди.")
+        await callback.answer("Р¤РѕР№РґР°Р»Р°РЅСѓРІС‡РёРіР° СЂСѓС…СЃР°С‚ Р±РµСЂРёР»РґРё.")
     else:
         await callback.answer(
-            "Сўров топилмади ёки аввал кўриб чиқилган.",
+            "РЎСћСЂРѕРІ С‚РѕРїРёР»РјР°РґРё С‘РєРё Р°РІРІР°Р» РєСћСЂРёР± С‡РёТ›РёР»РіР°РЅ.",
             show_alert=True
         )
 
@@ -475,7 +470,7 @@ async def approve_access(callback: CallbackQuery):
 async def reject_access(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer(
-            "Бу амални фақат администратор бажара олади!",
+            "Р‘Сѓ Р°РјР°Р»РЅРё С„Р°Т›Р°С‚ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ Р±Р°Р¶Р°СЂР° РѕР»Р°РґРё!",
             show_alert=True
         )
         return
@@ -483,7 +478,7 @@ async def reject_access(callback: CallbackQuery):
     try:
         user_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри сўров!", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё СЃСћСЂРѕРІ!", show_alert=True)
         return
 
     async with engine.begin() as connection:
@@ -501,19 +496,19 @@ async def reject_access(callback: CallbackQuery):
         try:
             await callback.bot.send_message(
                 user_id,
-                "❌ Сизнинг ботдан фойдаланиш "
-                "сўровингиз рад этилди."
+                "вќЊ РЎРёР·РЅРёРЅРі Р±РѕС‚РґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€ "
+                "СЃСћСЂРѕРІРёРЅРіРёР· СЂР°Рґ СЌС‚РёР»РґРё."
             )
         except Exception:
             pass
 
         await callback.message.edit_text(
-            callback.message.text + "\n\n❌ РАД ЭТИЛДИ"
+            callback.message.text + "\n\nвќЊ Р РђР” Р­РўРР›Р”Р"
         )
-        await callback.answer("Сўров рад этилди.")
+        await callback.answer("РЎСћСЂРѕРІ СЂР°Рґ СЌС‚РёР»РґРё.")
     else:
         await callback.answer(
-            "Сўров топилмади ёки аввал кўриб чиқилган.",
+            "РЎСћСЂРѕРІ С‚РѕРїРёР»РјР°РґРё С‘РєРё Р°РІРІР°Р» РєСћСЂРёР± С‡РёТ›РёР»РіР°РЅ.",
             show_alert=True
         )
 
@@ -552,14 +547,14 @@ async def create_dashboard_link(user_id):
     return f"{DASHBOARD_URL}/dashboard?token={raw_token}"
 
 
-@dp.message(F.text == "📈 Дашборд")
+@dp.message(F.text == "рџ“€ Р”Р°С€Р±РѕСЂРґ")
 async def dashboard_button(message: Message):
     user_id = message.from_user.id
 
     status = await get_access_status(user_id)
     if user_id != ADMIN_ID and status != "approved":
         await message.answer(
-            "Дашборддан фойдаланиш учун администратор рухсати керак."
+            "Р”Р°С€Р±РѕСЂРґРґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€ СѓС‡СѓРЅ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ СЂСѓС…СЃР°С‚Рё РєРµСЂР°Рє."
         )
         return
 
@@ -567,26 +562,26 @@ async def dashboard_button(message: Message):
         link = await create_dashboard_link(user_id)
     except Exception:
         await message.answer(
-            "Дашборд ҳаволасини яратишда хатолик юз берди. "
-            "Бироздан кейин қайта уриниб кўринг."
+            "Р”Р°С€Р±РѕСЂРґ ТіР°РІРѕР»Р°СЃРёРЅРё СЏСЂР°С‚РёС€РґР° С…Р°С‚РѕР»РёРє СЋР· Р±РµСЂРґРё. "
+            "Р‘РёСЂРѕР·РґР°РЅ РєРµР№РёРЅ Т›Р°Р№С‚Р° СѓСЂРёРЅРёР± РєСћСЂРёРЅРі."
         )
         return
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="📈 Дашбордни очиш",
+                text="рџ“€ Р”Р°С€Р±РѕСЂРґРЅРё РѕС‡РёС€",
                 url=link
             )
         ]]
     )
 
     await message.answer(
-        "📈 FAMILY MONEY ДАШБОРДИ\n\n"
-        "Қуйидаги тугма орқали шахсий ёки оилавий "
-        "молиявий кўрсаткичларни кўришингиз мумкин.\n\n"
-        "🔐 Ҳавола 7 кун давомида амал қилади. "
-        "Уни бошқа одамларга юборманг.",
+        "рџ“€ FAMILY MONEY Р”РђРЁР‘РћР Р”Р\n\n"
+        "ТљСѓР№РёРґР°РіРё С‚СѓРіРјР° РѕСЂТ›Р°Р»Рё С€Р°С…СЃРёР№ С‘РєРё РѕРёР»Р°РІРёР№ "
+        "РјРѕР»РёСЏРІРёР№ РєСћСЂСЃР°С‚РєРёС‡Р»Р°СЂРЅРё РєСћСЂРёС€РёРЅРіРёР· РјСѓРјРєРёРЅ.\n\n"
+        "рџ”ђ ТІР°РІРѕР»Р° 7 РєСѓРЅ РґР°РІРѕРјРёРґР° Р°РјР°Р» Т›РёР»Р°РґРё. "
+        "РЈРЅРё Р±РѕС€Т›Р° РѕРґР°РјР»Р°СЂРіР° СЋР±РѕСЂРјР°РЅРі.",
         reply_markup=keyboard
     )
 
@@ -621,8 +616,8 @@ async def start(message: Message):
     if user_id == ADMIN_ID:
         await save_user_profile(message.from_user)
         await message.answer(
-            "Салом, администратор! 👋\n"
-            "Family Money ботига хуш келибсиз!",
+            "РЎР°Р»РѕРј, Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ! рџ‘‹\n"
+            "Family Money Р±РѕС‚РёРіР° С…СѓС€ РєРµР»РёР±СЃРёР·!",
             reply_markup=main_keyboard()
         )
         return
@@ -636,19 +631,19 @@ async def start(message: Message):
     if status == "approved":
         await save_user_profile(message.from_user)
         await message.answer(
-            "Салом! Family Money ботига хуш келибсиз! 🎉",
+            "РЎР°Р»РѕРј! Family Money Р±РѕС‚РёРіР° С…СѓС€ РєРµР»РёР±СЃРёР·! рџЋ‰",
             reply_markup=main_keyboard()
         )
     else:
         await message.answer(
-            "⏳ Family Money ботидан фойдаланиш учун "
-            "администратор рухсати керак.\n\n"
-            "Сўровингиз администраторга юборилди. "
-            "Рухсат берилгач, ботдан фойдаланишингиз мумкин."
+            "вЏі Family Money Р±РѕС‚РёРґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€ СѓС‡СѓРЅ "
+            "Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ СЂСѓС…СЃР°С‚Рё РєРµСЂР°Рє.\n\n"
+            "РЎСћСЂРѕРІРёРЅРіРёР· Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРіР° СЋР±РѕСЂРёР»РґРё. "
+            "Р СѓС…СЃР°С‚ Р±РµСЂРёР»РіР°С‡, Р±РѕС‚РґР°РЅ С„РѕР№РґР°Р»Р°РЅРёС€РёРЅРіРёР· РјСѓРјРєРёРЅ."
         )
 
 
-@dp.message(F.text == "👨‍👩‍👧‍👦 Оилам")
+@dp.message(F.text == "рџ‘ЁвЂЌрџ‘©вЂЌрџ‘§вЂЌрџ‘¦ РћРёР»Р°Рј")
 async def family_home(message: Message):
     user_id = message.from_user.id
 
@@ -694,10 +689,10 @@ async def family_home(message: Message):
 
     if not family:
         await message.answer(
-            "👨‍👩‍👧‍👦 ОИЛА БЎЛИМИ\n\n"
-            "Сиз ҳозирча бирор оилага қўшилмагансиз.\n"
-            "Оила яратишингиз ёки таклиф коди орқали "
-            "қўшилишингиз мумкин.",
+            "рџ‘ЁвЂЌрџ‘©вЂЌрџ‘§вЂЌрџ‘¦ РћРР›Рђ Р‘РЋР›РРњР\n\n"
+            "РЎРёР· ТіРѕР·РёСЂС‡Р° Р±РёСЂРѕСЂ РѕРёР»Р°РіР° Т›СћС€РёР»РјР°РіР°РЅСЃРёР·.\n"
+            "РћРёР»Р° СЏСЂР°С‚РёС€РёРЅРіРёР· С‘РєРё С‚Р°РєР»РёС„ РєРѕРґРё РѕСЂТ›Р°Р»Рё "
+            "Т›СћС€РёР»РёС€РёРЅРіРёР· РјСѓРјРєРёРЅ.",
             reply_markup=family_action_keyboard()
         )
         return
@@ -705,27 +700,27 @@ async def family_home(message: Message):
     members_text = ""
     for index, member in enumerate(members, start=1):
         role = (
-            "Оила бошлиғи"
+            "РћРёР»Р° Р±РѕС€Р»РёТ“Рё"
             if member["role"] == "owner"
-            else "Аъзо"
+            else "РђСЉР·Рѕ"
         )
         full_name = (
-            member["full_name"] or "Исми ҳали аниқланмаган"
+            member["full_name"] or "РСЃРјРё ТіР°Р»Рё Р°РЅРёТ›Р»Р°РЅРјР°РіР°РЅ"
         )
         username = (
             f"@{member['username']}"
-            if member["username"] else "Username йўқ"
+            if member["username"] else "Username Р№СћТ›"
         )
         members_text += (
             f"{index}. {full_name}\n"
-            f"   {username} — {role}\n"
+            f"   {username} вЂ” {role}\n"
         )
 
     await message.answer(
-        f"👨‍👩‍👧‍👦 ОИЛАМ\n\n"
-        f"Оила рақами: {family['id']}\n"
-        f"Таклиф коди: {family['invite_code']}\n\n"
-        f"👥 Аъзолар сони: {len(members)} та\n\n"
+        f"рџ‘ЁвЂЌрџ‘©вЂЌрџ‘§вЂЌрџ‘¦ РћРР›РђРњ\n\n"
+        f"РћРёР»Р° СЂР°Т›Р°РјРё: {family['id']}\n"
+        f"РўР°РєР»РёС„ РєРѕРґРё: {family['invite_code']}\n\n"
+        f"рџ‘Ґ РђСЉР·РѕР»Р°СЂ СЃРѕРЅРё: {len(members)} С‚Р°\n\n"
         f"{members_text}",
         reply_markup=main_keyboard()
     )
@@ -739,7 +734,7 @@ async def create_family(callback: CallbackQuery):
         existing = await get_family_info(connection, user_id)
         if existing:
             await callback.answer(
-                "Сиз аллақачон оила аъзосисиз!",
+                "РЎРёР· Р°Р»Р»Р°Т›Р°С‡РѕРЅ РѕРёР»Р° Р°СЉР·РѕСЃРёСЃРёР·!",
                 show_alert=True
             )
             return
@@ -778,9 +773,9 @@ async def create_family(callback: CallbackQuery):
         )
 
     await callback.message.answer(
-        "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
-        f"🔑 Таклиф коди: {invite_code}\n\n"
-        "Ушбу кодни оила аъзоларингизга юборинг.",
+        "рџЋ‰ РћРР›РђРќР“РР— РњРЈР’РђР¤Р¤РђТљРРЇРўР›Р РЇР РђРўРР›Р”Р!\n\n"
+        f"рџ”‘ РўР°РєР»РёС„ РєРѕРґРё: {invite_code}\n\n"
+        "РЈС€Р±Сѓ РєРѕРґРЅРё РѕРёР»Р° Р°СЉР·РѕР»Р°СЂРёРЅРіРёР·РіР° СЋР±РѕСЂРёРЅРі.",
         reply_markup=main_keyboard()
     )
     await callback.answer()
@@ -795,15 +790,15 @@ async def family_join(callback: CallbackQuery):
 
     if existing:
         await callback.answer(
-            "Сиз аллақачон оила аъзосисиз!",
+            "РЎРёР· Р°Р»Р»Р°Т›Р°С‡РѕРЅ РѕРёР»Р° Р°СЉР·РѕСЃРёСЃРёР·!",
             show_alert=True
         )
         return
 
     family_pending[user_id] = True
     await callback.message.answer(
-        "🔑 Оила таклиф кодини киритинг.\n\n"
-        "Масалан: A1B2C3D4"
+        "рџ”‘ РћРёР»Р° С‚Р°РєР»РёС„ РєРѕРґРёРЅРё РєРёСЂРёС‚РёРЅРі.\n\n"
+        "РњР°СЃР°Р»Р°РЅ: A1B2C3D4"
     )
     await callback.answer()
 
@@ -904,38 +899,38 @@ async def get_category_scope(connection, user_id):
     )
 
 
-@dp.message(F.text == "⚙️ Категориялар")
+@dp.message(F.text == "вљ™пёЏ РљР°С‚РµРіРѕСЂРёСЏР»Р°СЂ")
 async def category_home(message: Message):
     user_id = message.from_user.id
     category_manage_pending.pop(user_id, None)
     date_flow.pop(user_id, None)
 
     await message.answer(
-        "⚙️ КАТЕГОРИЯЛАРНИ БОШҚАРИШ\n\n"
-        "Қўшиш ёки ўчириш амалини танланг.",
+        "вљ™пёЏ РљРђРўР•Р“РћР РРЇР›РђР РќР Р‘РћРЁТљРђР РРЁ\n\n"
+        "ТљСћС€РёС€ С‘РєРё СћС‡РёСЂРёС€ Р°РјР°Р»РёРЅРё С‚Р°РЅР»Р°РЅРі.",
         reply_markup=category_manage_keyboard()
     )
 
 
-@dp.message(F.text == "➕ Харажат категорияси қўшиш")
+@dp.message(F.text == "вћ• РҐР°СЂР°Р¶Р°С‚ РєР°С‚РµРіРѕСЂРёСЏСЃРё Т›СћС€РёС€")
 async def add_expense_category(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     category_manage_pending[user_id] = "expense"
     await message.answer(
-        "Янги харажат категорияси номини ёзинг.\n"
-        "Масалан: 🚘 Автомобиль таъмири"
+        "РЇРЅРіРё С…Р°СЂР°Р¶Р°С‚ РєР°С‚РµРіРѕСЂРёСЏСЃРё РЅРѕРјРёРЅРё С‘Р·РёРЅРі.\n"
+        "РњР°СЃР°Р»Р°РЅ: рџљ РђРІС‚РѕРјРѕР±РёР»СЊ С‚Р°СЉРјРёСЂРё"
     )
 
 
-@dp.message(F.text == "➕ Даромад категорияси қўшиш")
+@dp.message(F.text == "вћ• Р”Р°СЂРѕРјР°Рґ РєР°С‚РµРіРѕСЂРёСЏСЃРё Т›СћС€РёС€")
 async def add_income_category(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     category_manage_pending[user_id] = "income"
     await message.answer(
-        "Янги даромад категорияси номини ёзинг.\n"
-        "Масалан: 🏡 Ижара даромади"
+        "РЇРЅРіРё РґР°СЂРѕРјР°Рґ РєР°С‚РµРіРѕСЂРёСЏСЃРё РЅРѕРјРёРЅРё С‘Р·РёРЅРі.\n"
+        "РњР°СЃР°Р»Р°РЅ: рџЏЎ РР¶Р°СЂР° РґР°СЂРѕРјР°РґРё"
     )
 
 
@@ -971,29 +966,29 @@ async def show_categories_to_delete(message, entry_type):
 
     if not rows:
         await message.answer(
-            "Ўчириш учун категория топилмади.",
+            "РЋС‡РёСЂРёС€ СѓС‡СѓРЅ РєР°С‚РµРіРѕСЂРёСЏ С‚РѕРїРёР»РјР°РґРё.",
             reply_markup=category_manage_keyboard()
         )
         return
 
     buttons = [[InlineKeyboardButton(
-        text=f"🗑 {row['name']}",
+        text=f"рџ—‘ {row['name']}",
         callback_data=f"catdel:{entry_type}:{row['id']}"
     )] for row in rows]
 
     await message.answer(
-        "Ўчирмоқчи бўлган категорияни танланг.\n\n"
-        "Эслатма: эски операциялар тарихи сақланади.",
+        "РЋС‡РёСЂРјРѕТ›С‡Рё Р±СћР»РіР°РЅ РєР°С‚РµРіРѕСЂРёСЏРЅРё С‚Р°РЅР»Р°РЅРі.\n\n"
+        "Р­СЃР»Р°С‚РјР°: СЌСЃРєРё РѕРїРµСЂР°С†РёСЏР»Р°СЂ С‚Р°СЂРёС…Рё СЃР°Т›Р»Р°РЅР°РґРё.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
     )
 
 
-@dp.message(F.text == "➖ Харажат категориясини ўчириш")
+@dp.message(F.text == "вћ– РҐР°СЂР°Р¶Р°С‚ РєР°С‚РµРіРѕСЂРёСЏСЃРёРЅРё СћС‡РёСЂРёС€")
 async def delete_expense_category_menu(message: Message):
     await show_categories_to_delete(message, "expense")
 
 
-@dp.message(F.text == "➖ Даромад категориясини ўчириш")
+@dp.message(F.text == "вћ– Р”Р°СЂРѕРјР°Рґ РєР°С‚РµРіРѕСЂРёСЏСЃРёРЅРё СћС‡РёСЂРёС€")
 async def delete_income_category_menu(message: Message):
     await show_categories_to_delete(message, "income")
 
@@ -1004,7 +999,7 @@ async def delete_category(callback: CallbackQuery):
         _, entry_type, category_id = callback.data.split(":")
         category_id = int(category_id)
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри категория.", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё РєР°С‚РµРіРѕСЂРёСЏ.", show_alert=True)
         return
 
     async with engine.begin() as connection:
@@ -1033,12 +1028,12 @@ async def delete_category(callback: CallbackQuery):
 
     if result.rowcount:
         await callback.message.edit_text(
-            "✅ Категория ўчирилди. Аввалги операциялар тарихи сақланди."
+            "вњ… РљР°С‚РµРіРѕСЂРёСЏ СћС‡РёСЂРёР»РґРё. РђРІРІР°Р»РіРё РѕРїРµСЂР°С†РёСЏР»Р°СЂ С‚Р°СЂРёС…Рё СЃР°Т›Р»Р°РЅРґРё."
         )
-        await callback.answer("Категория ўчирилди.")
+        await callback.answer("РљР°С‚РµРіРѕСЂРёСЏ СћС‡РёСЂРёР»РґРё.")
     else:
         await callback.answer(
-            "Категория топилмади ёки аввал ўчирилган.",
+            "РљР°С‚РµРіРѕСЂРёСЏ С‚РѕРїРёР»РјР°РґРё С‘РєРё Р°РІРІР°Р» СћС‡РёСЂРёР»РіР°РЅ.",
             show_alert=True
         )
 
@@ -1046,76 +1041,24 @@ async def delete_category(callback: CallbackQuery):
 # =====================================================
 # HISOBOT VA TARIX
 # =====================================================
-@dp.message(F.text == "📈 Дашборд")
-async def open_dashboard(message: Message):
-    user_id = message.from_user.id
-
-    clear_user_states(user_id)
-
-    token = secrets.token_urlsafe(32)
-    token_hash = hash_token(token)
-
-    async with engine.begin() as connection:
-        await connection.execute(
-            text("""
-                DELETE FROM dashboard_sessions
-                WHERE expires_at < NOW()
-            """)
-        )
-
-        await connection.execute(
-            text("""
-                INSERT INTO dashboard_sessions
-                    (telegram_user_id, token_hash, expires_at)
-                VALUES
-                    (:user_id, :token_hash,
-                     NOW() + INTERVAL '7 days')
-            """),
-            {
-                "user_id": user_id,
-                "token_hash": token_hash
-            }
-        )
-
-    dashboard_link = f"{DASHBOARD_URL}/dashboard?token={token}"
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="📈 Дашбордни очиш",
-                    url=dashboard_link
-                )
-            ]
-        ]
-    )
-
-    await message.answer(
-        "📈 FAMILY MONEY — ДАШБОРД\n\n"
-        "Даромадлар, харажатлар, оила аъзолари "
-        "ва қарзлар бўйича маълумотларни кўриш учун "
-        "қуйидаги тугмани босинг.\n\n"
-        "🔐 Ҳавола 7 кун давомида амал қилади.",
-        reply_markup=keyboard
-    )
-    @dp.message(F.text == "📊 Ҳисобот")
+@dp.message(F.text == "рџ“Љ ТІРёСЃРѕР±РѕС‚")
 async def report_menu(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     date_flow[user_id] = "report"
     await message.answer(
-        "Ҳисобот даврини танланг:",
+        "ТІРёСЃРѕР±РѕС‚ РґР°РІСЂРёРЅРё С‚Р°РЅР»Р°РЅРі:",
         reply_markup=period_keyboard()
     )
 
 
-@dp.message(F.text == "🧾 Харажатлар тарихи")
+@dp.message(F.text == "рџ§ѕ РҐР°СЂР°Р¶Р°С‚Р»Р°СЂ С‚Р°СЂРёС…Рё")
 async def history_menu(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     date_flow[user_id] = "history"
     await message.answer(
-        "Тарих учун даврни танланг:",
+        "РўР°СЂРёС… СѓС‡СѓРЅ РґР°РІСЂРЅРё С‚Р°РЅР»Р°РЅРі:",
         reply_markup=period_keyboard()
     )
 
@@ -1123,14 +1066,14 @@ async def history_menu(message: Message):
 def get_period(period):
     today = datetime.now(TZ).date()
 
-    if period == "📅 Бугун":
-        return today, today, "Бугун"
-    if period == "📆 Шу ой":
-        return today.replace(day=1), today, "Шу ой"
-    if period == "🗓 Шу йил":
-        return today.replace(month=1, day=1), today, "Шу йил"
+    if period == "рџ“… Р‘СѓРіСѓРЅ":
+        return today, today, "Р‘СѓРіСѓРЅ"
+    if period == "рџ“† РЁСѓ РѕР№":
+        return today.replace(day=1), today, "РЁСѓ РѕР№"
+    if period == "рџ—“ РЁСѓ Р№РёР»":
+        return today.replace(month=1, day=1), today, "РЁСѓ Р№РёР»"
 
-    return None, None, "Барча вақт"
+    return None, None, "Р‘Р°СЂС‡Р° РІР°Т›С‚"
 
 
 def date_bounds(start_date, end_date):
@@ -1178,7 +1121,7 @@ async def show_history(
             text(f"""
                 SELECT id, telegram_user_id, entry_type,
                        item_name, amount,
-                       COALESCE(category, 'Категориясиз') AS category,
+                       COALESCE(category, 'РљР°С‚РµРіРѕСЂРёСЏСЃРёР·') AS category,
                        created_at
                 FROM transactions
                 WHERE {condition} {date_sql}
@@ -1191,25 +1134,25 @@ async def show_history(
 
     if not rows:
         await message.answer(
-            f"{period_label}\nУшбу даврда операциялар мавжуд эмас.",
+            f"{period_label}\nРЈС€Р±Сѓ РґР°РІСЂРґР° РѕРїРµСЂР°С†РёСЏР»Р°СЂ РјР°РІР¶СѓРґ СЌРјР°СЃ.",
             reply_markup=main_keyboard()
         )
         return
 
     title = (
-        "🧾 ОИЛАВИЙ ОПЕРАЦИЯЛАР"
+        "рџ§ѕ РћРР›РђР’РР™ РћРџР•Р РђР¦РРЇР›РђР "
         if info and info["role"] == "owner"
-        else "🧾 ОПЕРАЦИЯЛАР ТАРИХИ"
+        else "рџ§ѕ РћРџР•Р РђР¦РРЇР›РђР  РўРђР РРҐР"
     )
     await message.answer(
-        f"{title}\n📅 Давр: {period_label}\n(Охирги 10 та операция)"
+        f"{title}\nрџ“… Р”Р°РІСЂ: {period_label}\n(РћС…РёСЂРіРё 10 С‚Р° РѕРїРµСЂР°С†РёСЏ)"
     )
 
     for r in rows:
         kind = (
-            "➖ Харажат"
+            "вћ– РҐР°СЂР°Р¶Р°С‚"
             if r["entry_type"] == "expense"
-            else "➕ Даромад"
+            else "вћ• Р”Р°СЂРѕРјР°Рґ"
         )
         created = r["created_at"]
         if created.tzinfo is None:
@@ -1221,10 +1164,10 @@ async def show_history(
 
         operation_text = (
             f"{kind}\n"
-            f"📅 Сана: {local_date}\n"
-            f"📝 Номи: {r['item_name']}\n"
-            f"📂 Категория: {r['category']}\n"
-            f"💵 Сумма: {money(r['amount'])} сўм"
+            f"рџ“… РЎР°РЅР°: {local_date}\n"
+            f"рџ“ќ РќРѕРјРё: {r['item_name']}\n"
+            f"рџ“‚ РљР°С‚РµРіРѕСЂРёСЏ: {r['category']}\n"
+            f"рџ’µ РЎСѓРјРјР°: {money(r['amount'])} СЃСћРј"
         )
 
         if info and info["role"] == "owner":
@@ -1253,17 +1196,17 @@ async def show_history(
                 member_username = ""
 
             operation_text += (
-                f"\n👤 Киритган: {member_name}{member_username}"
+                f"\nрџ‘¤ РљРёСЂРёС‚РіР°РЅ: {member_name}{member_username}"
             )
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[[
                 InlineKeyboardButton(
-                    text="✏️ Таҳрирлаш",
+                    text="вњЏпёЏ РўР°ТіСЂРёСЂР»Р°С€",
                     callback_data=f"edit:{r['id']}"
                 ),
                 InlineKeyboardButton(
-                    text="🗑 Ўчириш",
+                    text="рџ—‘ РЋС‡РёСЂРёС€",
                     callback_data=f"delete:{r['id']}"
                 )
             ]]
@@ -1309,7 +1252,7 @@ async def show_report(
         result = await connection.execute(
             text(f"""
                 SELECT entry_type,
-                       COALESCE(category, 'Категориясиз') AS category,
+                       COALESCE(category, 'РљР°С‚РµРіРѕСЂРёСЏСЃРёР·') AS category,
                        SUM(amount) AS total,
                        COUNT(*) AS count
                 FROM transactions
@@ -1337,37 +1280,37 @@ async def show_report(
     )
 
     income_details = [
-        f"  • {r['category']}: {money(r['total'])} сўм"
+        f"  вЂў {r['category']}: {money(r['total'])} СЃСћРј"
         for r in rows if r["entry_type"] == "income"
     ]
     expense_details = [
-        f"  • {r['category']}: {money(r['total'])} сўм"
+        f"  вЂў {r['category']}: {money(r['total'])} СЃСћРј"
         for r in rows if r["entry_type"] == "expense"
     ]
 
     title = (
-        "📊 ОИЛАВИЙ ҲИСОБОТ"
-        if info else "📊 СИЗНИНГ ҲИСОБОТИНГИЗ"
+        "рџ“Љ РћРР›РђР’РР™ ТІРРЎРћР‘РћРў"
+        if info else "рџ“Љ РЎРР—РќРРќР“ ТІРРЎРћР‘РћРўРРќР“РР—"
     )
 
     report_text = (
         f"{title}\n"
-        f"📅 Давр: {period_label}\n\n"
-        f"💰 Жами даромад: {money(incomes)} сўм\n"
-        f"➕ Даромадлар сони: {income_count} та\n\n"
-        "💵 ДАРОМАДЛАР КАТЕГОРИЯСИ:\n"
+        f"рџ“… Р”Р°РІСЂ: {period_label}\n\n"
+        f"рџ’° Р–Р°РјРё РґР°СЂРѕРјР°Рґ: {money(incomes)} СЃСћРј\n"
+        f"вћ• Р”Р°СЂРѕРјР°РґР»Р°СЂ СЃРѕРЅРё: {income_count} С‚Р°\n\n"
+        "рџ’µ Р”РђР РћРњРђР”Р›РђР  РљРђРўР•Р“РћР РРЇРЎР:\n"
         + (
             "\n".join(income_details)
-            if income_details else "  Маълумот йўқ"
+            if income_details else "  РњР°СЉР»СѓРјРѕС‚ Р№СћТ›"
         )
-        + f"\n\n🛒 Жами харажат: {money(expenses)} сўм\n"
-        f"➖ Харажатлар сони: {expense_count} та\n\n"
-        "📂 ХАРАЖАТЛАР КАТЕГОРИЯСИ:\n"
+        + f"\n\nрџ›’ Р–Р°РјРё С…Р°СЂР°Р¶Р°С‚: {money(expenses)} СЃСћРј\n"
+        f"вћ– РҐР°СЂР°Р¶Р°С‚Р»Р°СЂ СЃРѕРЅРё: {expense_count} С‚Р°\n\n"
+        "рџ“‚ РҐРђР РђР–РђРўР›РђР  РљРђРўР•Р“РћР РРЇРЎР:\n"
         + (
             "\n".join(expense_details)
-            if expense_details else "  Маълумот йўқ"
+            if expense_details else "  РњР°СЉР»СѓРјРѕС‚ Р№СћТ›"
         )
-        + f"\n\n💵 Қолдиқ: {money(incomes - expenses)} сўм"
+        + f"\n\nрџ’µ ТљРѕР»РґРёТ›: {money(incomes - expenses)} СЃСћРј"
     )
 
     await message.answer(
@@ -1379,358 +1322,24 @@ async def show_report(
 # =====================================================
 # QARZLAR BO'LIMI
 # =====================================================
-async def debt_scope(connection, user_id):
-    info = await get_family_info(connection, user_id)
-    if info:
-        return info["family_id"], None
-    return None, user_id
-
-
-@dp.message(F.text == "💳 Қарзлар")
-async def debt_home(message: Message):
-    clear_user_states(message.from_user.id)
-    await message.answer(
-        "💳 ҚАРЗЛАР БЎЛИМИ\n\n"
-        "🤝 Берган қарзим — бошқа одам бизга қарздор.\n"
-        "📥 Олган қарзим — биз бошқа одамдан қарз олганмиз.\n\n"
-        "Керакли амални танланг.",
-        reply_markup=debt_keyboard()
-    )
-
-
-@dp.message(F.text == "🤝 Берган қарзим")
-async def debt_lent_start(message: Message):
-    user_id = message.from_user.id
-    clear_user_states(user_id)
-    debt_pending[user_id] = {
-        "direction": "lent",
-        "step": "name"
-    }
-    await message.answer(
-        "🤝 КИМГА ҚАРЗ БЕРДИНГИЗ?\n\n"
-        "Қарздор шахснинг исмини киритинг."
-    )
-
-
-@dp.message(F.text == "📥 Олган қарзим")
-async def debt_borrowed_start(message: Message):
-    user_id = message.from_user.id
-    clear_user_states(user_id)
-    debt_pending[user_id] = {
-        "direction": "borrowed",
-        "step": "name"
-    }
-    await message.answer(
-        "📥 КИМДАН ҚАРЗ ОЛДИНГИЗ?\n\n"
-        "Қарз берган шахснинг исмини киритинг."
-    )
-
-
-@dp.message(F.text == "📋 Қарзлар рўйхати")
-async def debt_list(message: Message):
-    user_id = message.from_user.id
-
-    async with engine.connect() as connection:
-        family_id, solo_user_id = await debt_scope(
-            connection, user_id
-        )
-
-        if family_id is not None:
-            condition = "family_id=:family_id"
-            params = {"family_id": family_id}
-        else:
-            condition = (
-                "family_id IS NULL AND created_by=:user_id"
-            )
-            params = {"user_id": solo_user_id}
-
-        result = await connection.execute(
-            text(f"""
-                SELECT id, direction, person_name,
-                       original_amount, remaining_amount,
-                       created_at, closed_at
-                FROM debts
-                WHERE {condition}
-                ORDER BY
-                    CASE WHEN remaining_amount > 0 THEN 0 ELSE 1 END,
-                    created_at DESC
-                LIMIT 50
-            """),
-            params
-        )
-        debts = result.mappings().all()
-
-    if not debts:
-        await message.answer(
-            "Ҳозирча қарзлар рўйхати бўш.",
-            reply_markup=debt_keyboard()
-        )
-        return
-
-    await message.answer("📋 ҚАРЗЛАР РЎЙХАТИ")
-
-    for debt in debts:
-        direction = (
-            "🤝 Биз берган қарз"
-            if debt["direction"] == "lent"
-            else "📥 Биз олган қарз"
-        )
-        created = debt["created_at"]
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=ZoneInfo("UTC"))
-        date_text = created.astimezone(TZ).strftime("%d.%m.%Y")
-
-        status = (
-            "✅ Ёпилган"
-            if Decimal(debt["remaining_amount"]) <= 0
-            else "🟡 Очиқ"
-        )
-
-        body = (
-            f"{direction}\n"
-            f"👤 Шахс: {debt['person_name']}\n"
-            f"📅 Сана: {date_text}\n"
-            f"💵 Дастлабки сумма: {money(debt['original_amount'])} сўм\n"
-            f"💰 Қолдиқ: {money(debt['remaining_amount'])} сўм\n"
-            f"📌 Ҳолат: {status}"
-        )
-
-        buttons = []
-        if Decimal(debt["remaining_amount"]) > 0:
-            buttons.append(InlineKeyboardButton(
-                text="💸 Қисман қайтариш",
-                callback_data=f"debt_repay:{debt['id']}"
-            ))
-        buttons.append(InlineKeyboardButton(
-            text="📜 Тарих",
-            callback_data=f"debt_history:{debt['id']}"
-        ))
-
-        await message.answer(
-            body,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[buttons]
-            )
-        )
-
-
-@dp.message(F.text == "📜 Қарзлар тарихи")
-async def debt_history_all(message: Message):
-    user_id = message.from_user.id
-
-    async with engine.connect() as connection:
-        family_id, solo_user_id = await debt_scope(
-            connection, user_id
-        )
-
-        if family_id is not None:
-            condition = "d.family_id=:family_id"
-            params = {"family_id": family_id}
-        else:
-            condition = (
-                "d.family_id IS NULL AND d.created_by=:user_id"
-            )
-            params = {"user_id": solo_user_id}
-
-        result = await connection.execute(
-            text(f"""
-                SELECT d.id, d.direction, d.person_name,
-                       d.original_amount, d.remaining_amount,
-                       d.created_at, d.closed_at,
-                       COALESCE(SUM(r.amount), 0) AS repaid
-                FROM debts d
-                LEFT JOIN debt_repayments r ON r.debt_id=d.id
-                WHERE {condition}
-                GROUP BY d.id
-                ORDER BY d.created_at DESC
-                LIMIT 50
-            """),
-            params
-        )
-        rows = result.mappings().all()
-
-    if not rows:
-        await message.answer(
-            "Қарзлар тарихи ҳозирча мавжуд эмас.",
-            reply_markup=debt_keyboard()
-        )
-        return
-
-    await message.answer("📜 ҚАРЗЛАР ТАРИХИ")
-
-    for row in rows:
-        direction = (
-            "Биз берган қарз"
-            if row["direction"] == "lent"
-            else "Биз олган қарз"
-        )
-        await message.answer(
-            f"👤 {row['person_name']}\n"
-            f"📌 {direction}\n"
-            f"💵 Дастлабки сумма: {money(row['original_amount'])} сўм\n"
-            f"💸 Қайтарилган: {money(row['repaid'])} сўм\n"
-            f"💰 Қолдиқ: {money(row['remaining_amount'])} сўм\n"
-            f"📅 Киритилган: {row['created_at'].astimezone(TZ).strftime('%d.%m.%Y') if row['created_at'].tzinfo else row['created_at'].strftime('%d.%m.%Y')}\n"
-            f"📌 Ҳолат: {'Ёпилган' if Decimal(row['remaining_amount']) <= 0 else 'Очиқ'}"
-        )
-
-
-@dp.callback_query(F.data.startswith("debt_repay:"))
-async def debt_repay_start(callback: CallbackQuery):
-    user_id = callback.from_user.id
-
-    try:
-        debt_id = int(callback.data.split(":")[1])
-    except (ValueError, IndexError):
-        await callback.answer("Нотўғри қарз рақами.", show_alert=True)
-        return
-
-    async with engine.connect() as connection:
-        family_id, solo_user_id = await debt_scope(
-            connection, user_id
-        )
-
-        if family_id is not None:
-            condition = "family_id=:family_id"
-            params = {"family_id": family_id, "id": debt_id}
-        else:
-            condition = (
-                "family_id IS NULL AND created_by=:user_id"
-            )
-            params = {"user_id": solo_user_id, "id": debt_id}
-
-        result = await connection.execute(
-            text(f"""
-                SELECT id, person_name, remaining_amount
-                FROM debts
-                WHERE id=:id AND {condition}
-            """),
-            params
-        )
-        debt = result.mappings().first()
-
-    if not debt or Decimal(debt["remaining_amount"]) <= 0:
-        await callback.answer(
-            "Очиқ қарз топилмади.",
-            show_alert=True
-        )
-        return
-
-    debt_pending[user_id] = {
-        "step": "repayment",
-        "debt_id": debt_id,
-        "remaining": str(debt["remaining_amount"])
-    }
-
-    await callback.message.answer(
-        f"💸 ҚАЙТАРИЛГАН СУММАНИ КИРИТИНГ\n\n"
-        f"Шахс: {debt['person_name']}\n"
-        f"Қолган қарз: {money(debt['remaining_amount'])} сўм\n\n"
-        "Қайтарилган суммани ёзинг."
-    )
-    await callback.answer()
-
-
-@dp.callback_query(F.data.startswith("debt_history:"))
-async def debt_history_one(callback: CallbackQuery):
-    user_id = callback.from_user.id
-
-    try:
-        debt_id = int(callback.data.split(":")[1])
-    except (ValueError, IndexError):
-        await callback.answer("Нотўғри қарз рақами.", show_alert=True)
-        return
-
-    async with engine.connect() as connection:
-        family_id, solo_user_id = await debt_scope(
-            connection, user_id
-        )
-
-        if family_id is not None:
-            condition = "d.family_id=:family_id"
-            params = {"family_id": family_id, "id": debt_id}
-        else:
-            condition = (
-                "d.family_id IS NULL AND d.created_by=:user_id"
-            )
-            params = {"user_id": solo_user_id, "id": debt_id}
-
-        debt_result = await connection.execute(
-            text(f"""
-                SELECT d.person_name, d.direction,
-                       d.original_amount, d.remaining_amount
-                FROM debts d
-                WHERE d.id=:id AND {condition}
-            """),
-            params
-        )
-        debt = debt_result.mappings().first()
-
-        if not debt:
-            await callback.answer("Қарз топилмади.", show_alert=True)
-            return
-
-        repayments_result = await connection.execute(
-            text("""
-                SELECT amount, created_at
-                FROM debt_repayments
-                WHERE debt_id=:debt_id
-                ORDER BY created_at DESC
-            """),
-            {"debt_id": debt_id}
-        )
-        repayments = repayments_result.mappings().all()
-
-    title = (
-        "🤝 Берилган қарз"
-        if debt["direction"] == "lent"
-        else "📥 Олинган қарз"
-    )
-
-    details = (
-        f"{title}\n"
-        f"👤 Шахс: {debt['person_name']}\n"
-        f"💵 Дастлабки сумма: {money(debt['original_amount'])} сўм\n"
-        f"💰 Қолдиқ: {money(debt['remaining_amount'])} сўм\n\n"
-        "📜 ҚАЙТАРИШЛАР:"
-    )
-
-    if repayments:
-        for item in repayments:
-            created = item["created_at"]
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=ZoneInfo("UTC"))
-            date_text = created.astimezone(TZ).strftime("%d.%m.%Y %H:%M")
-            details += (
-                f"\n• {date_text}: {money(item['amount'])} сўм"
-            )
-    else:
-        details += "\nҲали қайтариш амалга оширилмаган."
-
-    await callback.message.answer(details)
-    await callback.answer()
-
-# =====================================================
-# QARZLAR BO'LIMI
-# =====================================================
 
 def debt_menu_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
-                text="🤝 Берган қарзим",
+                text="рџ¤ќ Р‘РµСЂРіР°РЅ Т›Р°СЂР·РёРј",
                 callback_data="debt_new:given"
             )],
             [InlineKeyboardButton(
-                text="📥 Олган қарзим",
+                text="рџ“Ґ РћР»РіР°РЅ Т›Р°СЂР·РёРј",
                 callback_data="debt_new:taken"
             )],
             [InlineKeyboardButton(
-                text="📋 Қарзлар рўйхати",
+                text="рџ“‹ ТљР°СЂР·Р»Р°СЂ СЂСћР№С…Р°С‚Рё",
                 callback_data="debt_list:active"
             )],
             [InlineKeyboardButton(
-                text="📚 Ёпилган қарзлар",
+                text="рџ“љ РЃРїРёР»РіР°РЅ Т›Р°СЂР·Р»Р°СЂ",
                 callback_data="debt_list:closed"
             )]
         ]
@@ -1766,14 +1375,14 @@ async def get_debt_scope(connection, user_id):
     }
 
 
-@dp.message(F.text == "💳 Қарзлар")
+@dp.message(F.text == "рџ’і ТљР°СЂР·Р»Р°СЂ")
 async def debt_home(message: Message):
     clear_user_states(message.from_user.id)
 
     await message.answer(
-        "💳 ҚАРЗЛАР БЎЛИМИ\n\n"
-        "🤝 Берган қарзим — бошқалар бизга қайтариши керак.\n"
-        "📥 Олган қарзим — биз бошқаларга қайтаришимиз керак.",
+        "рџ’і ТљРђР Р—Р›РђР  Р‘РЋР›РРњР\n\n"
+        "рџ¤ќ Р‘РµСЂРіР°РЅ Т›Р°СЂР·РёРј вЂ” Р±РѕС€Т›Р°Р»Р°СЂ Р±РёР·РіР° Т›Р°Р№С‚Р°СЂРёС€Рё РєРµСЂР°Рє.\n"
+        "рџ“Ґ РћР»РіР°РЅ Т›Р°СЂР·РёРј вЂ” Р±РёР· Р±РѕС€Т›Р°Р»Р°СЂРіР° Т›Р°Р№С‚Р°СЂРёС€РёРјРёР· РєРµСЂР°Рє.",
         reply_markup=debt_menu_keyboard()
     )
 
@@ -1783,7 +1392,7 @@ async def debt_new(callback: CallbackQuery):
     direction = callback.data.split(":")[1]
 
     if direction not in ("given", "taken"):
-        await callback.answer("Нотўғри амал.", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё Р°РјР°Р».", show_alert=True)
         return
 
     debt_pending[callback.from_user.id] = {
@@ -1792,9 +1401,9 @@ async def debt_new(callback: CallbackQuery):
     }
 
     if direction == "given":
-        question = "Кимга қарз бердингиз? Исмини киритинг."
+        question = "РљРёРјРіР° Т›Р°СЂР· Р±РµСЂРґРёРЅРіРёР·? РСЃРјРёРЅРё РєРёСЂРёС‚РёРЅРі."
     else:
-        question = "Кимдан қарз олдингиз? Исмини киритинг."
+        question = "РљРёРјРґР°РЅ Т›Р°СЂР· РѕР»РґРёРЅРіРёР·? РСЃРјРёРЅРё РєРёСЂРёС‚РёРЅРі."
 
     await callback.message.answer(question)
     await callback.answer()
@@ -1831,10 +1440,10 @@ async def save_new_debt(message, data):
     debt_pending.pop(user_id, None)
 
     await message.answer(
-        "✅ ҚАРЗ САҚЛАНДИ!\n\n"
-        f"Шахс: {data['person_name']}\n"
-        f"Сумма: {data['amount']:,.0f} сўм\n"
-        f"Қолдиқ: {data['amount']:,.0f} сўм".replace(",", " "),
+        "вњ… ТљРђР Р— РЎРђТљР›РђРќР”Р!\n\n"
+        f"РЁР°С…СЃ: {data['person_name']}\n"
+        f"РЎСѓРјРјР°: {data['amount']:,.0f} СЃСћРј\n"
+        f"ТљРѕР»РґРёТ›: {data['amount']:,.0f} СЃСћРј".replace(",", " "),
         reply_markup=main_keyboard()
     )
 
@@ -1844,7 +1453,7 @@ async def debt_list(callback: CallbackQuery):
     status = callback.data.split(":")[1]
 
     if status not in ("active", "closed"):
-        await callback.answer("Нотўғри сўров.", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё СЃСћСЂРѕРІ.", show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -1878,20 +1487,20 @@ async def debt_list(callback: CallbackQuery):
         rows = result.mappings().all()
 
     if not rows:
-        await callback.message.answer("Бу бўлимда қарзлар йўқ.")
+        await callback.message.answer("Р‘Сѓ Р±СћР»РёРјРґР° Т›Р°СЂР·Р»Р°СЂ Р№СћТ›.")
         await callback.answer()
         return
 
     await callback.message.answer(
-        "📋 ФАОЛ ҚАРЗЛАР" if status == "active"
-        else "📚 ЁПИЛГАН ҚАРЗЛАР"
+        "рџ“‹ Р¤РђРћР› ТљРђР Р—Р›РђР " if status == "active"
+        else "рџ“љ РЃРџРР›Р“РђРќ ТљРђР Р—Р›РђР "
     )
 
     for debt in rows:
         direction = (
-            "🤝 Биз берган қарз"
+            "рџ¤ќ Р‘РёР· Р±РµСЂРіР°РЅ Т›Р°СЂР·"
             if debt["direction"] == "given"
-            else "📥 Биз олган қарз"
+            else "рџ“Ґ Р‘РёР· РѕР»РіР°РЅ Т›Р°СЂР·"
         )
 
         created = debt["created_at"]
@@ -1902,12 +1511,12 @@ async def debt_list(callback: CallbackQuery):
 
         message_text = (
             f"{direction}\n"
-            f"👤 Шахс: {debt['person_name']}\n"
-            f"📅 Сана: {date_text}\n"
-            f"💵 Бошланғич сумма: "
-            f"{float(debt['original_amount']):,.0f} сўм\n"
-            f"💰 Қолган қарз: "
-            f"{float(debt['remaining_amount']):,.0f} сўм"
+            f"рџ‘¤ РЁР°С…СЃ: {debt['person_name']}\n"
+            f"рџ“… РЎР°РЅР°: {date_text}\n"
+            f"рџ’µ Р‘РѕС€Р»Р°РЅТ“РёС‡ СЃСѓРјРјР°: "
+            f"{float(debt['original_amount']):,.0f} СЃСћРј\n"
+            f"рџ’° ТљРѕР»РіР°РЅ Т›Р°СЂР·: "
+            f"{float(debt['remaining_amount']):,.0f} СЃСћРј"
         ).replace(",", " ")
 
         buttons = []
@@ -1915,14 +1524,14 @@ async def debt_list(callback: CallbackQuery):
         if status == "active":
             buttons.append([
                 InlineKeyboardButton(
-                    text="💸 Қайтариш / тўлаш",
+                    text="рџ’ё ТљР°Р№С‚Р°СЂРёС€ / С‚СћР»Р°С€",
                     callback_data=f"debt_repay:{debt['id']}"
                 )
             ])
 
         buttons.append([
             InlineKeyboardButton(
-                text="📜 Қайтариш тарихи",
+                text="рџ“њ ТљР°Р№С‚Р°СЂРёС€ С‚Р°СЂРёС…Рё",
                 callback_data=f"debt_history:{debt['id']}"
             )
         ])
@@ -1942,7 +1551,7 @@ async def debt_repay_start(callback: CallbackQuery):
     try:
         debt_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри қарз.", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё Т›Р°СЂР·.", show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -1968,7 +1577,7 @@ async def debt_repay_start(callback: CallbackQuery):
         debt = result.mappings().first()
 
     if not debt:
-        await callback.answer("Қарз топилмади.", show_alert=True)
+        await callback.answer("ТљР°СЂР· С‚РѕРїРёР»РјР°РґРё.", show_alert=True)
         return
 
     debt_pending[user_id] = {
@@ -1977,10 +1586,10 @@ async def debt_repay_start(callback: CallbackQuery):
     }
 
     await callback.message.answer(
-        f"💸 Қанча сумма қайтарилди ёки тўланди?\n"
-        f"Шахс: {debt['person_name']}\n"
-        f"Қолган қарз: {float(debt['remaining_amount']):,.0f} сўм\n\n"
-        "Суммани киритинг.".replace(",", " ")
+        f"рџ’ё ТљР°РЅС‡Р° СЃСѓРјРјР° Т›Р°Р№С‚Р°СЂРёР»РґРё С‘РєРё С‚СћР»Р°РЅРґРё?\n"
+        f"РЁР°С…СЃ: {debt['person_name']}\n"
+        f"ТљРѕР»РіР°РЅ Т›Р°СЂР·: {float(debt['remaining_amount']):,.0f} СЃСћРј\n\n"
+        "РЎСѓРјРјР°РЅРё РєРёСЂРёС‚РёРЅРі.".replace(",", " ")
     )
 
     await callback.answer()
@@ -1991,7 +1600,7 @@ async def debt_history(callback: CallbackQuery):
     try:
         debt_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри қарз.", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё Т›Р°СЂР·.", show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -2016,7 +1625,7 @@ async def debt_history(callback: CallbackQuery):
         debt = debt_result.mappings().first()
 
         if not debt:
-            await callback.answer("Қарз топилмади.", show_alert=True)
+            await callback.answer("ТљР°СЂР· С‚РѕРїРёР»РјР°РґРё.", show_alert=True)
             return
 
         result = await connection.execute(
@@ -2033,10 +1642,10 @@ async def debt_history(callback: CallbackQuery):
 
     if not rows:
         await callback.message.answer(
-            f"{debt['person_name']} бўйича қайтариш тарихи ҳали йўқ."
+            f"{debt['person_name']} Р±СћР№РёС‡Р° Т›Р°Р№С‚Р°СЂРёС€ С‚Р°СЂРёС…Рё ТіР°Р»Рё Р№СћТ›."
         )
     else:
-        lines = ["📜 ҚАЙТАРИШ ТАРИХИ", f"Шахс: {debt['person_name']}"]
+        lines = ["рџ“њ ТљРђР™РўРђР РРЁ РўРђР РРҐР", f"РЁР°С…СЃ: {debt['person_name']}"]
 
         for row in rows:
             created = row["created_at"]
@@ -2046,8 +1655,8 @@ async def debt_history(callback: CallbackQuery):
             date_text = created.astimezone(TZ).strftime("%d.%m.%Y %H:%M")
 
             lines.append(
-                f"• {date_text} — "
-                f"{float(row['amount']):,.0f} сўм".replace(",", " ")
+                f"вЂў {date_text} вЂ” "
+                f"{float(row['amount']):,.0f} СЃСћРј".replace(",", " ")
             )
 
         await callback.message.answer("\n".join(lines))
@@ -2061,20 +1670,20 @@ async def process_debt_message(message, data):
 
     if data["step"] == "name":
         if len(incoming) < 2 or len(incoming) > 100:
-            await message.answer("Исмни тўғри киритинг.")
+            await message.answer("РСЃРјРЅРё С‚СћТ“СЂРё РєРёСЂРёС‚РёРЅРі.")
             return
 
         data["person_name"] = incoming
         data["step"] = "amount"
 
-        await message.answer("💵 Қарз суммасини киритинг.")
+        await message.answer("рџ’µ ТљР°СЂР· СЃСѓРјРјР°СЃРёРЅРё РєРёСЂРёС‚РёРЅРі.")
         return
 
     if data["step"] == "amount":
         amount = debt_amount(incoming)
 
         if amount is None:
-            await message.answer("Суммани тўғри киритинг.")
+            await message.answer("РЎСѓРјРјР°РЅРё С‚СћТ“СЂРё РєРёСЂРёС‚РёРЅРі.")
             return
 
         data["amount"] = amount
@@ -2085,7 +1694,7 @@ async def process_debt_message(message, data):
         amount = debt_amount(incoming)
 
         if amount is None:
-            await message.answer("Суммани тўғри киритинг.")
+            await message.answer("РЎСѓРјРјР°РЅРё С‚СћТ“СЂРё РєРёСЂРёС‚РёРЅРі.")
             return
 
         debt_id = data["debt_id"]
@@ -2114,7 +1723,7 @@ async def process_debt_message(message, data):
             if not debt:
                 debt_pending.pop(user_id, None)
                 await message.answer(
-                    "Қарз топилмади.",
+                    "ТљР°СЂР· С‚РѕРїРёР»РјР°РґРё.",
                     reply_markup=main_keyboard()
                 )
                 return
@@ -2123,8 +1732,8 @@ async def process_debt_message(message, data):
 
             if amount > remaining:
                 await message.answer(
-                    f"Сумма қолган қарздан кўп. Қолдиқ: "
-                    f"{float(remaining):,.0f} сўм".replace(",", " ")
+                    f"РЎСѓРјРјР° Т›РѕР»РіР°РЅ Т›Р°СЂР·РґР°РЅ РєСћРї. ТљРѕР»РґРёТ›: "
+                    f"{float(remaining):,.0f} СЃСћРј".replace(",", " ")
                 )
                 return
 
@@ -2164,64 +1773,64 @@ async def process_debt_message(message, data):
 
         await message.answer(
             (
-                "🎉 ҚАРЗ ТЎЛИҚ ЁПИЛДИ!"
+                "рџЋ‰ ТљРђР Р— РўРЋР›РТљ РЃРџРР›Р”Р!"
                 if new_remaining == 0
-                else "✅ Қисман қайтариш сақланди."
+                else "вњ… ТљРёСЃРјР°РЅ Т›Р°Р№С‚Р°СЂРёС€ СЃР°Т›Р»Р°РЅРґРё."
             )
-            + f"\nҚолган қарз: {float(new_remaining):,.0f} сўм".replace(",", " "),
+            + f"\nТљРѕР»РіР°РЅ Т›Р°СЂР·: {float(new_remaining):,.0f} СЃСћРј".replace(",", " "),
             reply_markup=main_keyboard()
         )
 # =====================================================
 # XARAJAT VA DAROMAD KIRITISH
 # =====================================================
-@dp.message(F.text == "➕ Харажат киритиш")
+@dp.message(F.text == "вћ• РҐР°СЂР°Р¶Р°С‚ РєРёСЂРёС‚РёС€")
 async def expense(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     pending[user_id] = {"type": "expense", "step": "amount"}
     await message.answer(
-        "Харажат номини ва суммасини ёзинг.\n"
-        "Масалан: Картошка 7000"
+        "РҐР°СЂР°Р¶Р°С‚ РЅРѕРјРёРЅРё РІР° СЃСѓРјРјР°СЃРёРЅРё С‘Р·РёРЅРі.\n"
+        "РњР°СЃР°Р»Р°РЅ: РљР°СЂС‚РѕС€РєР° 7000"
     )
 
 
-@dp.message(F.text == "💰 Даромад киритиш")
+@dp.message(F.text == "рџ’° Р”Р°СЂРѕРјР°Рґ РєРёСЂРёС‚РёС€")
 async def income(message: Message):
     user_id = message.from_user.id
     clear_user_states(user_id)
     pending[user_id] = {"type": "income", "step": "amount"}
     await message.answer(
-        "Даромад номини ва суммасини ёзинг.\n"
-        "Масалан: Маош 5000000"
+        "Р”Р°СЂРѕРјР°Рґ РЅРѕРјРёРЅРё РІР° СЃСѓРјРјР°СЃРёРЅРё С‘Р·РёРЅРі.\n"
+        "РњР°СЃР°Р»Р°РЅ: РњР°РѕС€ 5000000"
     )
 
 
-@dp.message(F.text == "❌ Бекор қилиш")
+@dp.message(F.text == "вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€")
 async def cancel(message: Message):
     clear_user_states(message.from_user.id)
     await message.answer(
-        "Маълумот бекор қилинди.",
+        "РњР°СЉР»СѓРјРѕС‚ Р±РµРєРѕСЂ Т›РёР»РёРЅРґРё.",
         reply_markup=main_keyboard()
     )
 
 
-@dp.message(F.text == "⬅️ Асосий меню")
+@dp.message(F.text == "в¬…пёЏ РђСЃРѕСЃРёР№ РјРµРЅСЋ")
 async def back_main(message: Message):
     clear_user_states(message.from_user.id)
     await message.answer(
-        "Асосий меню.",
+        "РђСЃРѕСЃРёР№ РјРµРЅСЋ.",
         reply_markup=main_keyboard()
     )
 
 
-@dp.message(F.text == "✅ Тасдиқлаш")
+@dp.message(F.text == "вњ… РўР°СЃРґРёТ›Р»Р°С€")
 async def confirm(message: Message):
     user_id = message.from_user.id
     data = pending.get(user_id)
 
     if not data or data.get("step") != "confirm":
         await message.answer(
-            "Тасдиқлаш учун маълумот топилмади.",
+            "РўР°СЃРґРёТ›Р»Р°С€ СѓС‡СѓРЅ РјР°СЉР»СѓРјРѕС‚ С‚РѕРїРёР»РјР°РґРё.",
             reply_markup=main_keyboard()
         )
         return
@@ -2264,29 +1873,29 @@ async def confirm(message: Message):
     pending.pop(user_id, None)
 
     await message.answer(
-        "✅ Маълумот базага сақланди!",
+        "вњ… РњР°СЉР»СѓРјРѕС‚ Р±Р°Р·Р°РіР° СЃР°Т›Р»Р°РЅРґРё!",
         reply_markup=main_keyboard()
     )
 
     if owner_id and owner_id != user_id:
         kind = (
-            "➖ ХАРАЖАТ"
+            "вћ– РҐРђР РђР–РђРў"
             if data["type"] == "expense"
-            else "➕ ДАРОМАД"
+            else "вћ• Р”РђР РћРњРђР”"
         )
         full_name = get_user_full_name(message.from_user)
         username = (
             f"@{message.from_user.username}"
-            if message.from_user.username else "Username йўқ"
+            if message.from_user.username else "Username Р№СћТ›"
         )
         notification = (
-            "🔔 ОИЛАДА ЯНГИ МАЪЛУМОТ!\n\n"
+            "рџ”” РћРР›РђР”Рђ РЇРќР“Р РњРђРЄР›РЈРњРћРў!\n\n"
             f"{kind}\n"
-            f"👤 Киритди: {full_name}\n"
-            f"🔹 Username: {username}\n"
-            f"📝 Номи: {data['name']}\n"
-            f"📂 Категория: {data['category']}\n"
-            f"💵 Сумма: {money(data['amount'])} сўм"
+            f"рџ‘¤ РљРёСЂРёС‚РґРё: {full_name}\n"
+            f"рџ”№ Username: {username}\n"
+            f"рџ“ќ РќРѕРјРё: {data['name']}\n"
+            f"рџ“‚ РљР°С‚РµРіРѕСЂРёСЏ: {data['category']}\n"
+            f"рџ’µ РЎСѓРјРјР°: {money(data['amount'])} СЃСћРј"
         )
         try:
             await message.bot.send_message(owner_id, notification)
@@ -2330,7 +1939,7 @@ async def edit_operation(callback: CallbackQuery):
     try:
         operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри операция!", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё РѕРїРµСЂР°С†РёСЏ!", show_alert=True)
         return
 
     async with engine.connect() as connection:
@@ -2352,27 +1961,27 @@ async def edit_operation(callback: CallbackQuery):
 
     if not operation:
         await callback.answer(
-            "Бу маълумотни таҳрирлашга рухсатингиз йўқ!",
+            "Р‘Сѓ РјР°СЉР»СѓРјРѕС‚РЅРё С‚Р°ТіСЂРёСЂР»Р°С€РіР° СЂСѓС…СЃР°С‚РёРЅРіРёР· Р№СћТ›!",
             show_alert=True
         )
         return
 
     editing[user_id] = operation_id
     await callback.message.answer(
-        "✏️ Янги ном ва суммани ёзинг.\n"
-        "Масалан: Гўшт 160000"
+        "вњЏпёЏ РЇРЅРіРё РЅРѕРј РІР° СЃСѓРјРјР°РЅРё С‘Р·РёРЅРі.\n"
+        "РњР°СЃР°Р»Р°РЅ: Р“СћС€С‚ 160000"
     )
     await callback.answer()
 
 
-@dp.message(F.text == "✅ Ўзгаришни тасдиқлаш")
+@dp.message(F.text == "вњ… РЋР·РіР°СЂРёС€РЅРё С‚Р°СЃРґРёТ›Р»Р°С€")
 async def confirm_edit(message: Message):
     user_id = message.from_user.id
     data = edit_pending.get(user_id)
 
     if not data:
         await message.answer(
-            "Тасдиқланадиган ўзгариш топилмади.",
+            "РўР°СЃРґРёТ›Р»Р°РЅР°РґРёРіР°РЅ СћР·РіР°СЂРёС€ С‚РѕРїРёР»РјР°РґРё.",
             reply_markup=main_keyboard()
         )
         return
@@ -2387,7 +1996,7 @@ async def confirm_edit(message: Message):
             edit_pending.pop(user_id, None)
             editing.pop(user_id, None)
             await message.answer(
-                "❌ Бу маълумотни ўзгартиришга рухсатингиз йўқ.",
+                "вќЊ Р‘Сѓ РјР°СЉР»СѓРјРѕС‚РЅРё СћР·РіР°СЂС‚РёСЂРёС€РіР° СЂСѓС…СЃР°С‚РёРЅРіРёР· Р№СћТ›.",
                 reply_markup=main_keyboard()
             )
             return
@@ -2408,7 +2017,7 @@ async def confirm_edit(message: Message):
     edit_pending.pop(user_id, None)
     editing.pop(user_id, None)
     await message.answer(
-        "✅ Операция муваффақиятли янгиланди!",
+        "вњ… РћРїРµСЂР°С†РёСЏ РјСѓРІР°С„С„Р°Т›РёСЏС‚Р»Рё СЏРЅРіРёР»Р°РЅРґРё!",
         reply_markup=main_keyboard()
     )
 
@@ -2420,7 +2029,7 @@ async def delete_operation(callback: CallbackQuery):
     try:
         operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри операция!", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё РѕРїРµСЂР°С†РёСЏ!", show_alert=True)
         return
 
     async with engine.connect() as connection:
@@ -2430,7 +2039,7 @@ async def delete_operation(callback: CallbackQuery):
 
     if not allowed:
         await callback.answer(
-            "Бу маълумотни ўчиришга рухсатингиз йўқ!",
+            "Р‘Сѓ РјР°СЉР»СѓРјРѕС‚РЅРё СћС‡РёСЂРёС€РіР° СЂСѓС…СЃР°С‚РёРЅРіРёР· Р№СћТ›!",
             show_alert=True
         )
         return
@@ -2438,17 +2047,17 @@ async def delete_operation(callback: CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="✅ Ҳа, ўчириш",
+                text="вњ… ТІР°, СћС‡РёСЂРёС€",
                 callback_data=f"delete_yes:{operation_id}"
             ),
             InlineKeyboardButton(
-                text="❌ Йўқ",
+                text="вќЊ Р™СћТ›",
                 callback_data=f"delete_no:{operation_id}"
             )
         ]]
     )
     await callback.message.answer(
-        "⚠️ Ушбу операцияни ўчиришни тасдиқлайсизми?",
+        "вљ пёЏ РЈС€Р±Сѓ РѕРїРµСЂР°С†РёСЏРЅРё СћС‡РёСЂРёС€РЅРё С‚Р°СЃРґРёТ›Р»Р°Р№СЃРёР·РјРё?",
         reply_markup=keyboard
     )
     await callback.answer()
@@ -2461,7 +2070,7 @@ async def confirm_delete(callback: CallbackQuery):
     try:
         operation_id = int(callback.data.split(":")[1])
     except (ValueError, IndexError):
-        await callback.answer("Нотўғри операция!", show_alert=True)
+        await callback.answer("РќРѕС‚СћТ“СЂРё РѕРїРµСЂР°С†РёСЏ!", show_alert=True)
         return
 
     async with engine.begin() as connection:
@@ -2477,18 +2086,18 @@ async def confirm_delete(callback: CallbackQuery):
         )
 
     if result and result.rowcount:
-        await callback.message.edit_text("✅ Операция ўчирилди.")
+        await callback.message.edit_text("вњ… РћРїРµСЂР°С†РёСЏ СћС‡РёСЂРёР»РґРё.")
     else:
         await callback.message.edit_text(
-            "❌ Бу операцияни ўчиришга рухсатингиз йўқ "
-            "ёки у топилмади."
+            "вќЊ Р‘Сѓ РѕРїРµСЂР°С†РёСЏРЅРё СћС‡РёСЂРёС€РіР° СЂСѓС…СЃР°С‚РёРЅРіРёР· Р№СћТ› "
+            "С‘РєРё Сѓ С‚РѕРїРёР»РјР°РґРё."
         )
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("delete_no:"))
 async def cancel_delete(callback: CallbackQuery):
-    await callback.message.edit_text("❌ Ўчириш бекор қилинди.")
+    await callback.message.edit_text("вќЊ РЋС‡РёСЂРёС€ Р±РµРєРѕСЂ Т›РёР»РёРЅРґРё.")
     await callback.answer()
 
 
@@ -2505,204 +2114,7 @@ async def messages(message: Message):
             debt_pending[user_id]
         )
         return
-    # Қарз киритиш ва қисман қайтариш
-    debt_data = debt_pending.get(user_id)
-
-    if debt_data:
-        if debt_data["step"] == "name":
-            if len(incoming) < 2 or len(incoming) > 100:
-                await message.answer(
-                    "Исм 2 тадан 100 тагача белги бўлиши керак."
-                )
-                return
-
-            debt_data["person_name"] = incoming
-            debt_data["step"] = "amount"
-            await message.answer(
-                "Қарз суммасини киритинг.\n"
-                "Масалан: 500000"
-            )
-            return
-
-        if debt_data["step"] == "amount":
-            amount = parse_amount(incoming)
-            if amount is None:
-                await message.answer(
-                    "Суммани тўғри киритинг. Масалан: 500000"
-                )
-                return
-
-            debt_data["amount"] = amount
-            debt_data["step"] = "confirm"
-
-            direction_text = (
-                "Биз берган қарз"
-                if debt_data["direction"] == "lent"
-                else "Биз олган қарз"
-            )
-
-            await message.answer(
-                "📋 ҚАРЗ МАЪЛУМОТЛАРИ\n\n"
-                f"Тури: {direction_text}\n"
-                f"Шахс: {debt_data['person_name']}\n"
-                f"Сумма: {money(amount)} сўм\n\n"
-                "Сақлаш учун «✅ Қарзни сақлаш» тугмасини босинг.",
-                reply_markup=ReplyKeyboardMarkup(
-                    keyboard=[
-                        [KeyboardButton(text="✅ Қарзни сақлаш")],
-                        [KeyboardButton(text="❌ Бекор қилиш")]
-                    ],
-                    resize_keyboard=True
-                )
-            )
-            return
-
-        if debt_data["step"] == "repayment":
-            amount = parse_amount(incoming)
-            if amount is None:
-                await message.answer(
-                    "Қайтарилган суммани тўғри киритинг."
-                )
-                return
-
-            remaining = Decimal(debt_data["remaining"])
-            if amount > remaining:
-                await message.answer(
-                    f"Қайтариш суммаси қолган қарздан кўп.\n"
-                    f"Максимал сумма: {money(remaining)} сўм"
-                )
-                return
-
-            debt_id = debt_data["debt_id"]
-
-            async with engine.begin() as connection:
-                family_id, solo_user_id = await debt_scope(
-                    connection, user_id
-                )
-
-                if family_id is not None:
-                    condition = "family_id=:family_id"
-                    params = {
-                        "family_id": family_id,
-                        "id": debt_id
-                    }
-                else:
-                    condition = (
-                        "family_id IS NULL AND created_by=:user_id"
-                    )
-                    params = {
-                        "user_id": solo_user_id,
-                        "id": debt_id
-                    }
-
-                check = await connection.execute(
-                    text(f"""
-                        SELECT remaining_amount
-                        FROM debts
-                        WHERE id=:id AND {condition}
-                        FOR UPDATE
-                    """),
-                    params
-                )
-                current = check.scalar()
-
-                if current is None:
-                    debt_pending.pop(user_id, None)
-                    await message.answer(
-                        "Қарз топилмади.",
-                        reply_markup=debt_keyboard()
-                    )
-                    return
-
-                current = Decimal(current)
-                if amount > current:
-                    await message.answer(
-                        f"Қолган қарз: {money(current)} сўм. "
-                        "Суммани қайта киритинг."
-                    )
-                    debt_data["remaining"] = str(current)
-                    return
-
-                new_remaining = current - amount
-
-                await connection.execute(
-                    text("""
-                        INSERT INTO debt_repayments
-                            (debt_id, amount, paid_by)
-                        VALUES (:debt_id, :amount, :paid_by)
-                    """),
-                    {
-                        "debt_id": debt_id,
-                        "amount": amount,
-                        "paid_by": user_id
-                    }
-                )
-
-                await connection.execute(
-                    text("""
-                        UPDATE debts
-                        SET remaining_amount=:remaining,
-                            closed_at=CASE
-                                WHEN :remaining=0 THEN NOW()
-                                ELSE NULL
-                            END
-                        WHERE id=:debt_id
-                    """),
-                    {
-                        "remaining": new_remaining,
-                        "debt_id": debt_id
-                    }
-                )
-
-            debt_pending.pop(user_id, None)
-            await message.answer(
-                "✅ Қарз қайтарилиши сақланди!\n\n"
-                f"Қайтарилди: {money(amount)} сўм\n"
-                f"Қолдиқ: {money(new_remaining)} сўм\n"
-                + (
-                    "\n🎉 Қарз тўлиқ ёпилди!"
-                    if new_remaining == 0 else ""
-                ),
-                reply_markup=debt_keyboard()
-            )
-            return
-
-        if debt_data["step"] == "confirm":
-            if incoming != "✅ Қарзни сақлаш":
-                return
-
-            async with engine.begin() as connection:
-                family_id = await get_family_id(
-                    connection, user_id
-                )
-
-                await connection.execute(
-                    text("""
-                        INSERT INTO debts
-                            (family_id, created_by, direction,
-                             person_name, original_amount,
-                             remaining_amount)
-                        VALUES
-                            (:family_id, :created_by, :direction,
-                             :person_name, :amount, :amount)
-                    """),
-                    {
-                        "family_id": family_id,
-                        "created_by": user_id,
-                        "direction": debt_data["direction"],
-                        "person_name": debt_data["person_name"],
-                        "amount": debt_data["amount"]
-                    }
-                )
-
-            debt_pending.pop(user_id, None)
-            await message.answer(
-                "✅ Қарз маълумоти сақланди!",
-                reply_markup=debt_keyboard()
-            )
-            return
-
-    # Оила таклиф коди
+    # РћРёР»Р° С‚Р°РєР»РёС„ РєРѕРґРё
     if user_id in family_pending:
         invite_code = incoming.upper()
 
@@ -2711,7 +2123,7 @@ async def messages(message: Message):
             if existing:
                 family_pending.pop(user_id, None)
                 await message.answer(
-                    "Сиз аллақачон оила аъзосисиз!",
+                    "РЎРёР· Р°Р»Р»Р°Т›Р°С‡РѕРЅ РѕРёР»Р° Р°СЉР·РѕСЃРёСЃРёР·!",
                     reply_markup=main_keyboard()
                 )
                 return
@@ -2728,8 +2140,8 @@ async def messages(message: Message):
 
             if not family_id:
                 await message.answer(
-                    "❌ Таклиф коди нотўғри.\n"
-                    "Илтимос, кодни қайта киритинг."
+                    "вќЊ РўР°РєР»РёС„ РєРѕРґРё РЅРѕС‚СћТ“СЂРё.\n"
+                    "РР»С‚РёРјРѕСЃ, РєРѕРґРЅРё Т›Р°Р№С‚Р° РєРёСЂРёС‚РёРЅРі."
                 )
                 return
 
@@ -2752,23 +2164,23 @@ async def messages(message: Message):
 
         family_pending.pop(user_id, None)
         await message.answer(
-            "🎉 Сиз оилага муваффақиятли қўшилдингиз!",
+            "рџЋ‰ РЎРёР· РѕРёР»Р°РіР° РјСѓРІР°С„С„Р°Т›РёСЏС‚Р»Рё Т›СћС€РёР»РґРёРЅРіРёР·!",
             reply_markup=main_keyboard()
         )
         return
 
-    # Сана даврини танлаш
+    # РЎР°РЅР° РґР°РІСЂРёРЅРё С‚Р°РЅР»Р°С€
     if user_id in date_flow:
         flow = date_flow[user_id]
 
         if flow.endswith("_custom"):
-            parts = re.split(r"\s*[-–—]\s*", incoming)
+            parts = re.split(r"\s*[-вЂ“вЂ”]\s*", incoming)
 
             if len(parts) != 2:
                 await message.answer(
-                    "Санани шу форматда киритинг:\n"
-                    "ДД.ММ.ЙЙЙЙ - ДД.ММ.ЙЙЙЙ\n"
-                    "Масалан: 01.11.2026 - 13.11.2026"
+                    "РЎР°РЅР°РЅРё С€Сѓ С„РѕСЂРјР°С‚РґР° РєРёСЂРёС‚РёРЅРі:\n"
+                    "Р”Р”.РњРњ.Р™Р™Р™Р™ - Р”Р”.РњРњ.Р™Р™Р™Р™\n"
+                    "РњР°СЃР°Р»Р°РЅ: 01.11.2026 - 13.11.2026"
                 )
                 return
 
@@ -2781,15 +2193,15 @@ async def messages(message: Message):
                 ).date()
             except ValueError:
                 await message.answer(
-                    "Сана нотўғри. Масалан: "
+                    "РЎР°РЅР° РЅРѕС‚СћТ“СЂРё. РњР°СЃР°Р»Р°РЅ: "
                     "01.11.2026 - 13.11.2026"
                 )
                 return
 
             if end_date < start_date:
                 await message.answer(
-                    "Тугаш санаси бошланиш санасидан "
-                    "олдин бўлмаслиги керак."
+                    "РўСѓРіР°С€ СЃР°РЅР°СЃРё Р±РѕС€Р»Р°РЅРёС€ СЃР°РЅР°СЃРёРґР°РЅ "
+                    "РѕР»РґРёРЅ Р±СћР»РјР°СЃР»РёРіРё РєРµСЂР°Рє."
                 )
                 return
 
@@ -2809,31 +2221,31 @@ async def messages(message: Message):
                 )
             return
 
-        if incoming == "✍️ Бошқа давр":
+        if incoming == "вњЌпёЏ Р‘РѕС€Т›Р° РґР°РІСЂ":
             date_flow[user_id] = flow + "_custom"
             await message.answer(
-                "Бошланиш ва тугаш санасини киритинг:\n"
-                "ДД.ММ.ЙЙЙЙ - ДД.ММ.ЙЙЙЙ\n"
-                "Масалан: 01.11.2026 - 13.11.2026"
+                "Р‘РѕС€Р»Р°РЅРёС€ РІР° С‚СѓРіР°С€ СЃР°РЅР°СЃРёРЅРё РєРёСЂРёС‚РёРЅРі:\n"
+                "Р”Р”.РњРњ.Р™Р™Р™Р™ - Р”Р”.РњРњ.Р™Р™Р™Р™\n"
+                "РњР°СЃР°Р»Р°РЅ: 01.11.2026 - 13.11.2026"
             )
             return
 
-        if incoming == "❌ Бекор қилиш":
+        if incoming == "вќЊ Р‘РµРєРѕСЂ Т›РёР»РёС€":
             date_flow.pop(user_id, None)
             await message.answer(
-                "Бекор қилинди.",
+                "Р‘РµРєРѕСЂ Т›РёР»РёРЅРґРё.",
                 reply_markup=main_keyboard()
             )
             return
 
-        if incoming == "📋 Барча вақт":
+        if incoming == "рџ“‹ Р‘Р°СЂС‡Р° РІР°Т›С‚":
             start_date = end_date = None
-            label = "Барча вақт"
-        elif incoming in ("📅 Бугун", "📆 Шу ой", "🗓 Шу йил"):
+            label = "Р‘Р°СЂС‡Р° РІР°Т›С‚"
+        elif incoming in ("рџ“… Р‘СѓРіСѓРЅ", "рџ“† РЁСѓ РѕР№", "рџ—“ РЁСѓ Р№РёР»"):
             start_date, end_date, label = get_period(incoming)
         else:
             await message.answer(
-                "Илтимос, даврни тугмалар орқали танланг.",
+                "РР»С‚РёРјРѕСЃ, РґР°РІСЂРЅРё С‚СѓРіРјР°Р»Р°СЂ РѕСЂТ›Р°Р»Рё С‚Р°РЅР»Р°РЅРі.",
                 reply_markup=period_keyboard()
             )
             return
@@ -2845,15 +2257,15 @@ async def messages(message: Message):
             await show_history(message, start_date, end_date, label)
         return
 
-    # Янги категория номини қабул қилиш
+    # РЇРЅРіРё РєР°С‚РµРіРѕСЂРёСЏ РЅРѕРјРёРЅРё Т›Р°Р±СѓР» Т›РёР»РёС€
     if user_id in category_manage_pending:
         entry_type = category_manage_pending[user_id]
         name = incoming.strip()
 
         if len(name) < 2 or len(name) > 60:
             await message.answer(
-                "Категория номи 2 тадан 60 тагача "
-                "белги бўлиши керак. Қайта киритинг."
+                "РљР°С‚РµРіРѕСЂРёСЏ РЅРѕРјРё 2 С‚Р°РґР°РЅ 60 С‚Р°РіР°С‡Р° "
+                "Р±РµР»РіРё Р±СћР»РёС€Рё РєРµСЂР°Рє. ТљР°Р№С‚Р° РєРёСЂРёС‚РёРЅРі."
             )
             return
 
@@ -2885,8 +2297,8 @@ async def messages(message: Message):
             if existing_category:
                 if existing_category["is_active"]:
                     await message.answer(
-                        "Бундай категория аллақачон мавжуд. "
-                        "Бошқа ном киритинг."
+                        "Р‘СѓРЅРґР°Р№ РєР°С‚РµРіРѕСЂРёСЏ Р°Р»Р»Р°Т›Р°С‡РѕРЅ РјР°РІР¶СѓРґ. "
+                        "Р‘РѕС€Т›Р° РЅРѕРј РєРёСЂРёС‚РёРЅРі."
                     )
                     return
 
@@ -2919,33 +2331,33 @@ async def messages(message: Message):
 
         category_manage_pending.pop(user_id, None)
         await message.answer(
-            f"✅ Категория қўшилди ёки қайта фаоллаштирилди:\n{name}",
+            f"вњ… РљР°С‚РµРіРѕСЂРёСЏ Т›СћС€РёР»РґРё С‘РєРё Т›Р°Р№С‚Р° С„Р°РѕР»Р»Р°С€С‚РёСЂРёР»РґРё:\n{name}",
             reply_markup=category_manage_keyboard()
         )
         return
 
-    # Таҳрирлаш учун янги ном ва сумма
+    # РўР°ТіСЂРёСЂР»Р°С€ СѓС‡СѓРЅ СЏРЅРіРё РЅРѕРј РІР° СЃСѓРјРјР°
     if user_id in editing:
         numbers = re.findall(r"\d+(?:[.,]\d+)?", incoming)
 
         if not numbers:
             await message.answer(
-                "Суммани ҳам киритинг.\n"
-                "Масалан: Гўшт 160000"
+                "РЎСѓРјРјР°РЅРё ТіР°Рј РєРёСЂРёС‚РёРЅРі.\n"
+                "РњР°СЃР°Р»Р°РЅ: Р“СћС€С‚ 160000"
             )
             return
 
         amount = numbers[-1].replace(",", ".")
         name = re.sub(r"\d+(?:[.,]\d+)?", "", incoming)
         name = re.sub(
-            r"\b(сўм|сум|uzs)\b",
+            r"\b(СЃСћРј|СЃСѓРј|uzs)\b",
             "",
             name,
             flags=re.IGNORECASE
         ).strip(" ,.-")
 
         if not name:
-            await message.answer("Операция номини ҳам киритинг.")
+            await message.answer("РћРїРµСЂР°С†РёСЏ РЅРѕРјРёРЅРё ТіР°Рј РєРёСЂРёС‚РёРЅРі.")
             return
 
         edit_pending[user_id] = {
@@ -2955,19 +2367,19 @@ async def messages(message: Message):
         }
 
         await message.answer(
-            "✏️ ЎЗГАРТИРИЛГАН МАЪЛУМОТ:\n\n"
-            f"Номи: {name}\n"
-            f"Суммаси: {amount} сўм\n\n"
-            "Ўзгаришни тасдиқлайсизми?",
+            "вњЏпёЏ РЋР—Р“РђР РўРР РР›Р“РђРќ РњРђРЄР›РЈРњРћРў:\n\n"
+            f"РќРѕРјРё: {name}\n"
+            f"РЎСѓРјРјР°СЃРё: {amount} СЃСћРј\n\n"
+            "РЋР·РіР°СЂРёС€РЅРё С‚Р°СЃРґРёТ›Р»Р°Р№СЃРёР·РјРё?",
             reply_markup=edit_confirm_keyboard
         )
         return
 
-    # Кутилаётган харажат ёки даромад
+    # РљСѓС‚РёР»Р°С‘С‚РіР°РЅ С…Р°СЂР°Р¶Р°С‚ С‘РєРё РґР°СЂРѕРјР°Рґ
     data = pending.get(user_id)
     if not data:
         await message.answer(
-            "Керакли бўлимни танланг.",
+            "РљРµСЂР°РєР»Рё Р±СћР»РёРјРЅРё С‚Р°РЅР»Р°РЅРі.",
             reply_markup=main_keyboard()
         )
         return
@@ -2977,7 +2389,7 @@ async def messages(message: Message):
 
         if incoming not in categories:
             await message.answer(
-                "Илтимос, рўйхатдан категория танланг.",
+                "РР»С‚РёРјРѕСЃ, СЂСћР№С…Р°С‚РґР°РЅ РєР°С‚РµРіРѕСЂРёСЏ С‚Р°РЅР»Р°РЅРі.",
                 reply_markup=category_keyboard(categories)
             )
             return
@@ -2985,18 +2397,18 @@ async def messages(message: Message):
         data["category"] = incoming
         data["step"] = "confirm"
         kind = (
-            "Харажат"
+            "РҐР°СЂР°Р¶Р°С‚"
             if data["type"] == "expense"
-            else "Даромад"
+            else "Р”Р°СЂРѕРјР°Рґ"
         )
 
         await message.answer(
-            "Маълумотни текширинг:\n\n"
-            f"Тури: {kind}\n"
-            f"Номи: {data['name']}\n"
-            f"Категория: {data['category']}\n"
-            f"Суммаси: {data['amount']} сўм\n\n"
-            "Сақлашни тасдиқлайсизми?",
+            "РњР°СЉР»СѓРјРѕС‚РЅРё С‚РµРєС€РёСЂРёРЅРі:\n\n"
+            f"РўСѓСЂРё: {kind}\n"
+            f"РќРѕРјРё: {data['name']}\n"
+            f"РљР°С‚РµРіРѕСЂРёСЏ: {data['category']}\n"
+            f"РЎСѓРјРјР°СЃРё: {data['amount']} СЃСћРј\n\n"
+            "РЎР°Т›Р»Р°С€РЅРё С‚Р°СЃРґРёТ›Р»Р°Р№СЃРёР·РјРё?",
             reply_markup=confirm_keyboard
         )
         return
@@ -3004,21 +2416,21 @@ async def messages(message: Message):
     numbers = re.findall(r"\d+(?:[.,]\d+)?", incoming)
     if not numbers:
         await message.answer(
-            "Суммани ҳам ёзинг. Масалан: Картошка 7000"
+            "РЎСѓРјРјР°РЅРё ТіР°Рј С‘Р·РёРЅРі. РњР°СЃР°Р»Р°РЅ: РљР°СЂС‚РѕС€РєР° 7000"
         )
         return
 
     amount = numbers[-1].replace(",", ".")
     name = re.sub(r"\d+(?:[.,]\d+)?", "", incoming)
     name = re.sub(
-        r"\b(сўм|сум|uzs)\b",
+        r"\b(СЃСћРј|СЃСѓРј|uzs)\b",
         "",
         name,
         flags=re.IGNORECASE
     ).strip(" ,.-")
 
     if not name:
-        await message.answer("Номини ҳам ёзинг.")
+        await message.answer("РќРѕРјРёРЅРё ТіР°Рј С‘Р·РёРЅРі.")
         return
 
     data["name"] = name
@@ -3027,7 +2439,7 @@ async def messages(message: Message):
 
     categories = await get_categories(user_id, data["type"])
     await message.answer(
-        "Қайси категорияга киради?",
+        "ТљР°Р№СЃРё РєР°С‚РµРіРѕСЂРёСЏРіР° РєРёСЂР°РґРё?",
         reply_markup=category_keyboard(categories)
     )
 
@@ -3037,7 +2449,7 @@ async def messages(message: Message):
 # =====================================================
 async def main():
     if not TOKEN:
-        raise RuntimeError("BOT_TOKEN киритилмаган!")
+        raise RuntimeError("BOT_TOKEN РєРёСЂРёС‚РёР»РјР°РіР°РЅ!")
 
     async with engine.begin() as connection:
         await connection.execute(
@@ -3049,7 +2461,7 @@ async def main():
                 )
             """)
         )
-                await connection.execute(
+        await connection.execute(
             text("""
                 CREATE TABLE IF NOT EXISTS dashboard_sessions (
                     id BIGSERIAL PRIMARY KEY,

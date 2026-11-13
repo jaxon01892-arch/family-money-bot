@@ -61,6 +61,7 @@ dp = Dispatcher()
 
 pending = {}
 editing = {}
+edit_pending = {}
 family_pending = {}
 
 
@@ -116,6 +117,15 @@ confirm_keyboard = ReplyKeyboardMarkup(
 )
 
 
+edit_confirm_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="✅ Ўзгаришни тасдиқлаш")],
+        [KeyboardButton(text="❌ Бекор қилиш")]
+    ],
+    resize_keyboard=True
+)
+
+
 # OILA TUGMALARI
 def family_action_keyboard():
     return InlineKeyboardMarkup(
@@ -136,18 +146,86 @@ def family_action_keyboard():
     )
 
 
-# FOYDALANUVCHINING OILASINI ANIQLASH
-async def get_family_id(connection, user_id):
+# FOYDALANUVCHI OILASI
+async def get_family_info(connection, user_id):
     result = await connection.execute(
         text("""
-            SELECT family_id
+            SELECT
+                family_id,
+                role
             FROM family_members
             WHERE telegram_user_id = :user_id
         """),
         {"user_id": user_id}
     )
 
-    return result.scalar()
+    row = result.mappings().first()
+
+    if not row:
+        return None
+
+    return {
+        "family_id": row["family_id"],
+        "role": row["role"]
+    }
+
+
+async def get_family_id(connection, user_id):
+    info = await get_family_info(connection, user_id)
+
+    if not info:
+        return None
+
+    return info["family_id"]
+
+
+# OPERATSIYAGA RUXSATNI TEKSHIRISH
+async def can_manage_transaction(connection, user_id, operation_id):
+    info = await get_family_info(connection, user_id)
+
+    result = await connection.execute(
+        text("""
+            SELECT
+                t.id,
+                t.telegram_user_id,
+                t.family_id
+            FROM transactions t
+            WHERE t.id = :operation_id
+        """),
+        {"operation_id": operation_id}
+    )
+
+    operation = result.mappings().first()
+
+    if not operation:
+        return False
+
+    # Foydalanuvchi o'zi kiritgan ma'lumotni boshqarishi mumkin
+    if operation["telegram_user_id"] == user_id:
+        return True
+
+    # Oila boshlig'i o'z oilasidagi barcha ma'lumotlarni boshqaradi
+    if info and info["role"] == "owner":
+        if operation["family_id"] == info["family_id"]:
+            return True
+
+    return False
+
+
+# HISOBOT VA TARIX UCHUN FILTR
+def transaction_filter(info, user_id):
+    if info and info["role"] == "owner":
+        return """
+            (
+                family_id = :family_id
+                OR (
+                    telegram_user_id = :user_id
+                    AND family_id IS NULL
+                )
+            )
+        """
+
+    return "telegram_user_id = :user_id"
 
 
 # START
@@ -157,6 +235,7 @@ async def start(message: Message):
 
     pending.pop(user_id, None)
     editing.pop(user_id, None)
+    edit_pending.pop(user_id, None)
     family_pending.pop(user_id, None)
 
     await message.answer(
@@ -168,7 +247,12 @@ async def start(message: Message):
 # XARAJAT
 @dp.message(F.text == "➕ Харажат киритиш")
 async def expense(message: Message):
-    pending[message.from_user.id] = {
+    user_id = message.from_user.id
+
+    editing.pop(user_id, None)
+    edit_pending.pop(user_id, None)
+
+    pending[user_id] = {
         "type": "expense",
         "step": "amount"
     }
@@ -182,7 +266,12 @@ async def expense(message: Message):
 # DAROMAD
 @dp.message(F.text == "💰 Даромад киритиш")
 async def income(message: Message):
-    pending[message.from_user.id] = {
+    user_id = message.from_user.id
+
+    editing.pop(user_id, None)
+    edit_pending.pop(user_id, None)
+
+    pending[user_id] = {
         "type": "income",
         "step": "amount"
     }
@@ -200,6 +289,7 @@ async def cancel(message: Message):
 
     pending.pop(user_id, None)
     editing.pop(user_id, None)
+    edit_pending.pop(user_id, None)
     family_pending.pop(user_id, None)
 
     await message.answer(
@@ -208,7 +298,7 @@ async def cancel(message: Message):
     )
 
 
-# OILAM BO'LIMI
+# OILAM
 @dp.message(F.text == "👨‍👩‍👧‍👦 Оилам")
 async def family_home(message: Message):
     user_id = message.from_user.id
@@ -272,8 +362,7 @@ async def family_home(message: Message):
         f"Оила рақами: {family['id']}\n"
         f"Таклиф коди: {family['invite_code']}\n\n"
         f"👥 Аъзолар сони: {len(members)} та\n\n"
-        f"{members_text}\n"
-        "Янги аъзоларни таклиф коди орқали қўшишингиз мумкин.",
+        f"{members_text}",
         reply_markup=main_keyboard()
     )
 
@@ -284,18 +373,9 @@ async def create_family(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     async with engine.begin() as connection:
-        existing = await connection.execute(
-            text("""
-                SELECT family_id
-                FROM family_members
-                WHERE telegram_user_id = :user_id
-            """),
-            {"user_id": user_id}
-        )
+        existing = await get_family_info(connection, user_id)
 
-        existing_family = existing.scalar()
-
-        if existing_family:
+        if existing:
             await callback.answer(
                 "Сиз аллақачон оила аъзосисиз!",
                 show_alert=True
@@ -346,8 +426,7 @@ async def create_family(callback: CallbackQuery):
     await callback.message.answer(
         "🎉 ОИЛАНГИЗ МУВАФФАҚИЯТЛИ ЯРАТИЛДИ!\n\n"
         f"🔑 Таклиф коди: {invite_code}\n\n"
-        "Ушбу кодни оила аъзоларингизга юборинг.\n"
-        "Улар код орқали оилангизга қўшилишлари мумкин.",
+        "Ушбу кодни оила аъзоларингизга юборинг.",
         reply_markup=main_keyboard()
     )
 
@@ -360,21 +439,14 @@ async def family_join(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     async with engine.connect() as connection:
-        existing = await connection.execute(
-            text("""
-                SELECT family_id
-                FROM family_members
-                WHERE telegram_user_id = :user_id
-            """),
-            {"user_id": user_id}
-        )
+        existing = await get_family_info(connection, user_id)
 
-        if existing.scalar():
-            await callback.answer(
-                "Сиз аллақачон оила аъзосисиз!",
-                show_alert=True
-            )
-            return
+    if existing:
+        await callback.answer(
+            "Сиз аллақачон оила аъзосисиз!",
+            show_alert=True
+        )
+        return
 
     family_pending[user_id] = True
 
@@ -392,21 +464,31 @@ async def history(message: Message):
     user_id = message.from_user.id
 
     async with engine.connect() as connection:
+        info = await get_family_info(connection, user_id)
+
+        condition = transaction_filter(info, user_id)
+
+        params = {"user_id": user_id}
+
+        if info and info["role"] == "owner":
+            params["family_id"] = info["family_id"]
+
         result = await connection.execute(
-            text("""
+            text(f"""
                 SELECT
                     id,
+                    telegram_user_id,
                     entry_type,
                     item_name,
                     amount,
                     COALESCE(category, 'Категориясиз') AS category,
                     created_at
                 FROM transactions
-                WHERE telegram_user_id = :user_id
+                WHERE {condition}
                 ORDER BY created_at DESC
                 LIMIT 10
             """),
-            {"user_id": user_id}
+            params
         )
 
         rows = result.mappings().all()
@@ -418,7 +500,13 @@ async def history(message: Message):
         )
         return
 
-    await message.answer("🧾 ОХИРГИ 10 ТА ОПЕРАЦИЯ:")
+    title = (
+        "🧾 ОИЛАВИЙ ОПЕРАЦИЯЛАР:"
+        if info and info["role"] == "owner"
+        else "🧾 СИЗНИНГ ОПЕРАЦИЯЛАРИНГИЗ:"
+    )
+
+    await message.answer(title)
 
     for r in rows:
         kind = (
@@ -436,6 +524,11 @@ async def history(message: Message):
             f"📂 Категория: {r['category']}\n"
             f"💵 Сумма: {r['amount']:,.0f} сўм"
         ).replace(",", " ")
+
+        if info and info["role"] == "owner":
+            operation_text += (
+                f"\n👤 Киритган ID: {r['telegram_user_id']}"
+            )
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -464,19 +557,28 @@ async def report(message: Message):
     user_id = message.from_user.id
 
     async with engine.connect() as connection:
+        info = await get_family_info(connection, user_id)
+
+        condition = transaction_filter(info, user_id)
+
+        params = {"user_id": user_id}
+
+        if info and info["role"] == "owner":
+            params["family_id"] = info["family_id"]
+
         result = await connection.execute(
-            text("""
+            text(f"""
                 SELECT
                     entry_type,
                     COALESCE(category, 'Категориясиз') AS category,
                     SUM(amount) AS total,
                     COUNT(*) AS count
                 FROM transactions
-                WHERE telegram_user_id = :user_id
+                WHERE {condition}
                 GROUP BY entry_type, category
                 ORDER BY entry_type, category
             """),
-            {"user_id": user_id}
+            params
         )
 
         rows = result.mappings().all()
@@ -513,8 +615,14 @@ async def report(message: Message):
         if r["entry_type"] == "expense"
     ]
 
+    title = (
+        "📊 ОИЛАВИЙ ҲИСОБОТ"
+        if info and info["role"] == "owner"
+        else "📊 СИЗНИНГ ҲИСОБОТИНГИЗ"
+    )
+
     report_text = (
-        "📊 СИЗНИНГ ҲИСОБОТИНГИЗ\n\n"
+        f"{title}\n\n"
         f"💰 Жами даромад: {incomes:,.0f} сўм\n"
         f"➕ Даромадлар сони: {income_count} та\n\n"
         "💵 ДАРОМАДЛАР КАТЕГОРИЯСИ:\n"
@@ -540,7 +648,7 @@ async def report(message: Message):
     )
 
 
-# MA'LUMOTNI TASDIQLASH
+# YANGI MA'LUMOTNI TASDIQLASH
 @dp.message(F.text == "✅ Тасдиқлаш")
 async def confirm(message: Message):
     user_id = message.from_user.id
@@ -598,27 +706,40 @@ async def confirm(message: Message):
 @dp.callback_query(F.data.startswith("edit:"))
 async def edit_operation(callback: CallbackQuery):
     user_id = callback.from_user.id
-    operation_id = int(callback.data.split(":")[1])
+
+    try:
+        operation_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри операция!", show_alert=True)
+        return
 
     async with engine.connect() as connection:
-        result = await connection.execute(
-            text("""
-                SELECT id
-                FROM transactions
-                WHERE id = :id
-                  AND telegram_user_id = :user_id
-            """),
-            {
-                "id": operation_id,
-                "user_id": user_id
-            }
+        allowed = await can_manage_transaction(
+            connection,
+            user_id,
+            operation_id
         )
 
-        row = result.first()
+        if allowed:
+            result = await connection.execute(
+                text("""
+                    SELECT
+                        item_name,
+                        amount,
+                        category
+                    FROM transactions
+                    WHERE id = :id
+                """),
+                {"id": operation_id}
+            )
 
-    if not row:
+            operation = result.mappings().first()
+        else:
+            operation = None
+
+    if not operation:
         await callback.answer(
-            "Операция топилмади!",
+            "Бу маълумотни таҳрирлашга рухсатингиз йўқ!",
             show_alert=True
         )
         return
@@ -633,31 +754,81 @@ async def edit_operation(callback: CallbackQuery):
     await callback.answer()
 
 
+# TAHRIRLASHNI TASDIQLASH
+@dp.message(F.text == "✅ Ўзгаришни тасдиқлаш")
+async def confirm_edit(message: Message):
+    user_id = message.from_user.id
+    data = edit_pending.get(user_id)
+
+    if not data:
+        await message.answer(
+            "Тасдиқланадиган ўзгариш топилмади.",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    operation_id = data["id"]
+
+    async with engine.begin() as connection:
+        allowed = await can_manage_transaction(
+            connection,
+            user_id,
+            operation_id
+        )
+
+        if not allowed:
+            edit_pending.pop(user_id, None)
+
+            await message.answer(
+                "❌ Бу маълумотни ўзгартиришга рухсатингиз йўқ.",
+                reply_markup=main_keyboard()
+            )
+            return
+
+        await connection.execute(
+            text("""
+                UPDATE transactions
+                SET item_name = :name,
+                    amount = :amount
+                WHERE id = :id
+            """),
+            {
+                "name": data["name"],
+                "amount": data["amount"],
+                "id": operation_id
+            }
+        )
+
+    edit_pending.pop(user_id, None)
+    editing.pop(user_id, None)
+
+    await message.answer(
+        "✅ Операция муваффақиятли янгиланди!",
+        reply_markup=main_keyboard()
+    )
+
+
 # OPERATSIYANI O'CHIRISH
 @dp.callback_query(F.data.startswith("delete:"))
 async def delete_operation(callback: CallbackQuery):
     user_id = callback.from_user.id
-    operation_id = int(callback.data.split(":")[1])
+
+    try:
+        operation_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри операция!", show_alert=True)
+        return
 
     async with engine.connect() as connection:
-        result = await connection.execute(
-            text("""
-                SELECT id
-                FROM transactions
-                WHERE id = :id
-                  AND telegram_user_id = :user_id
-            """),
-            {
-                "id": operation_id,
-                "user_id": user_id
-            }
+        allowed = await can_manage_transaction(
+            connection,
+            user_id,
+            operation_id
         )
 
-        row = result.first()
-
-    if not row:
+    if not allowed:
         await callback.answer(
-            "Операция топилмади!",
+            "Бу маълумотни ўчиришга рухсатингиз йўқ!",
             show_alert=True
         )
         return
@@ -685,36 +856,48 @@ async def delete_operation(callback: CallbackQuery):
     await callback.answer()
 
 
+# O'CHIRISHNI TASDIQLASH
 @dp.callback_query(F.data.startswith("delete_yes:"))
 async def confirm_delete(callback: CallbackQuery):
     user_id = callback.from_user.id
-    operation_id = int(callback.data.split(":")[1])
+
+    try:
+        operation_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Нотўғри операция!", show_alert=True)
+        return
 
     async with engine.begin() as connection:
-        result = await connection.execute(
-            text("""
-                DELETE FROM transactions
-                WHERE id = :id
-                  AND telegram_user_id = :user_id
-            """),
-            {
-                "id": operation_id,
-                "user_id": user_id
-            }
+        allowed = await can_manage_transaction(
+            connection,
+            user_id,
+            operation_id
         )
 
-    if result.rowcount:
+        if allowed:
+            result = await connection.execute(
+                text("""
+                    DELETE FROM transactions
+                    WHERE id = :id
+                """),
+                {"id": operation_id}
+            )
+        else:
+            result = None
+
+    if result and result.rowcount:
         await callback.message.edit_text(
             "✅ Операция ўчирилди."
         )
     else:
         await callback.message.edit_text(
-            "Операция топилмади."
+            "❌ Бу операцияни ўчиришга рухсатингиз йўқ ёки у топилмади."
         )
 
     await callback.answer()
 
 
+# O'CHIRISHNI BEKOR QILISH
 @dp.callback_query(F.data.startswith("delete_no:"))
 async def cancel_delete(callback: CallbackQuery):
     await callback.message.edit_text(
@@ -729,21 +912,14 @@ async def cancel_delete(callback: CallbackQuery):
 async def messages(message: Message):
     user_id = message.from_user.id
 
-    # OILAGA TAKLIF KODI ORQALI QO'SHILISH
+    # OILAGA TAKLIF KODI
     if user_id in family_pending:
         invite_code = message.text.strip().upper()
 
         async with engine.begin() as connection:
-            existing = await connection.execute(
-                text("""
-                    SELECT family_id
-                    FROM family_members
-                    WHERE telegram_user_id = :user_id
-                """),
-                {"user_id": user_id}
-            )
+            existing = await get_family_info(connection, user_id)
 
-            if existing.scalar():
+            if existing:
                 family_pending.pop(user_id, None)
 
                 await message.answer(
@@ -797,7 +973,7 @@ async def messages(message: Message):
         )
         return
 
-    # TAHRIRLASH JARAYONI
+    # TAHRIRLASH MA'LUMOTINI QABUL QILISH
     if user_id in editing:
         numbers = re.findall(
             r"\d+(?:[.,]\d+)?",
@@ -828,35 +1004,24 @@ async def messages(message: Message):
 
         if not name:
             await message.answer(
-                "Операция номини ҳам киритинг.\n"
-                "Масалан: Гўшт 160000"
+                "Операция номини ҳам киритинг."
             )
             return
 
         operation_id = editing[user_id]
 
-        async with engine.begin() as connection:
-            await connection.execute(
-                text("""
-                    UPDATE transactions
-                    SET item_name = :name,
-                        amount = :amount
-                    WHERE id = :id
-                      AND telegram_user_id = :user_id
-                """),
-                {
-                    "name": name,
-                    "amount": amount,
-                    "id": operation_id,
-                    "user_id": user_id
-                }
-            )
-
-        editing.pop(user_id, None)
+        edit_pending[user_id] = {
+            "id": operation_id,
+            "name": name,
+            "amount": amount
+        }
 
         await message.answer(
-            "✅ Операция янгиланди!",
-            reply_markup=main_keyboard()
+            "✏️ ЎЗГАРТИРИЛГАН МАЪЛУМОТ:\n\n"
+            f"Номи: {name}\n"
+            f"Суммаси: {amount} сўм\n\n"
+            "Ўзгаришни тасдиқлайсизми?",
+            reply_markup=edit_confirm_keyboard
         )
         return
 

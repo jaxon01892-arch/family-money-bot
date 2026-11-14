@@ -72,7 +72,9 @@ def get_database_url():
 
 engine = create_async_engine(
     get_database_url(),
-    connect_args={"ssl": "require", "statement_cache_size": 0}
+    connect_args={"ssl": "require", "statement_cache_size": 0},
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 dp = Dispatcher()
